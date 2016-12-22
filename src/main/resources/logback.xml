@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <encoder>
+            <pattern>%gray(%date{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC}) %highlight(%-5level) %cyan(%logger{360}) --%magenta(%X{debugId}) %gray(%msg%n)</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ROLLING_FILE_FULL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/full/fundmng-gate.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/full/fundmng-gate.%d{yyyy-MM-dd-HH-mm, UTC}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC} %-5level %logger{1} --%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ROLLING_FILE_RESTFUL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/restful/fundmng-gate-restful.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/restful/fundmng-gate-restful.%d{yyyy-MM-dd-HH, UTC}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC} %-5level %logger{1} --%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ROLLING_FILE_HQY" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/com.heqiying.fundmng.gate/fundmng-gate-hqy.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/com.heqiying.fundmng.gate/fundmng-gate-hqy.%d{yyyy-MM-dd-HH, UTC}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC} %-5level %logger{1} --%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="akka.actor.RepointableActorRef" level="INFO">
+        <appender-ref ref="ROLLING_FILE_RESTFUL"/>
+        <appender-ref ref="ROLLING_FILE_FULL"/>
+    </logger>
+
+    <logger name="com.heqiying.fundmng.gate" level="DEBUG">
+        <appender-ref ref="ROLLING_FILE_HQY"/>
+        <appender-ref ref="ROLLING_FILE_FULL"/>
+    </logger>
+
+    <logger name="slick" level="WARN"/>
+    <!-- <logger name="slick.session" level="DEBUG"/> -->
+    <!-- <logger name="slick.jdbc.JdbcBackend.statement" level="DEBUG"/> -->
+    <!-- <logger name="slick.jdbc" level="WARN"/> -->
+
+    <root level="${log.root:-debug}">
+        <appender-ref ref="ROLLING_FILE_FULL"/>
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
