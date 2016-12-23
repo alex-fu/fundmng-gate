@@ -8,7 +8,7 @@ val root = project.in(file("."))
   .settings(dependencySettings)
   .settings(testDependencySettings)
 //  .settings(wartRemoverSettings)
-  .settings(coverageSettings)
+//  .settings(coverageSettings)
 //  .settings(releaseSettings)
 
 lazy val commonSettings = Seq(
@@ -99,9 +99,10 @@ lazy val wartRemoverSettings = Seq(
 )
 
 lazy val commonScalacOptions = Seq(
-    "-deprecation"             // Emit warning and location for usages of deprecated APIs
+    "-deprecation"               // Emit warning and location for usages of deprecated APIs
   , "-encoding", "UTF-8"
-  , "-feature"                 // Emit warning and location for usages of features that should be imported explicitly
+  , "-feature"                   // Emit warning and location for usages of features that should be imported explicitly
+  , "-language:postfixOps"
 //  , "-unchecked"               // Enable additional warnings where generated code depends on assumptions
 //  , "-Xfatal-warnings"         // Fail the compilation if there are any warnings
 //  , "-Xfuture"                 // Turn on future language features

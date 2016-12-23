@@ -1,7 +1,6 @@
 package com.heqiying.fundmng.gate.common
 
-import com.typesafe.scalalogging.{LazyLogging => LL}
-
+import com.typesafe.scalalogging.{ LazyLogging => LL }
 
 trait LazyLogging extends LL {
   lazy val isSqlDebugEnabled = AppConfig.config.getBoolean("logs.sql.debug")

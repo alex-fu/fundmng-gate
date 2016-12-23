@@ -7,14 +7,15 @@ import akka.http.scaladsl.server.directives._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.RouteResult
 import akka.http.scaladsl.server.RouteResult._
+import com.heqiying.fundmng.gate.api.UserAPI
 import com.heqiying.fundmng.gate.common.LazyLogging
 
 class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
   private[this] val swaggerDocService = new SwaggerDocService(system)
 
   private[this] val routes = Seq(
-    swaggerDocService.docsRoutes
-//    new SellerAPI routes
+    swaggerDocService.docsRoutes,
+    new UserAPI routes
   )
 
   val r0 = routes.reduceLeft { _ ~ _ }
@@ -25,9 +26,13 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
       Some(LogEntry(
         s"""request completed. status = ${response.status}, method = ${request.method},
            |path = ${request.uri}, headers = ${response.headers}, encoding = ${response.encoding.value},
-           |response length = ${response.entity.contentLengthOption.getOrElse(0L)} bytes"""".toString, Logging.InfoLevel))
+           |response length = ${response.entity.contentLengthOption.getOrElse(0L)} bytes"""".stripMargin.toString,
+        Logging.InfoLevel
+      ))
 
-    case _ => None
+    case _ =>
+      logger.warn("No HttpResponse received!")
+      None
   }
 
 }
