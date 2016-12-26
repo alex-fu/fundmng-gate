@@ -11,7 +11,7 @@
     <appender name="ROLLING_FILE_FULL" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/full/fundmng-gate.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/full/fundmng-gate.%d{yyyy-MM-dd-HH-mm, UTC}.log</fileNamePattern>
+            <fileNamePattern>logs/full/fundmng-gate.%d{yyyy-MM-dd-HH, UTC}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>
