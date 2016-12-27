@@ -6,10 +6,11 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.model.User
-import com.heqiying.fundmng.gate.directives.FileDirective._
+import com.heqiying.fundmng.gate.directives.MultipartFormDirective._
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
-
 import java.io.File
+
+import scala.util.{ Failure, Success }
 
 @Api(value = "User API", produces = "application/json")
 @Path("/api/v1/user")
@@ -59,7 +60,7 @@ class UserAPI(implicit system: ActorSystem) extends LazyLogging {
     new ApiImplicitParam(name = "userid", required = true, dataType = "integer", paramType = "path")
   ))
   def getUserXIdentityRoute = path("api" / "v1" / "user" / IntNumber / "identity") { userid =>
-    import com.heqiying.fundmng.gate.directives.FileDirective.FileInfoJsonSupport._
+    import com.heqiying.fundmng.gate.directives.MultipartFormDirective.FileInfoJsonSupport._
     get {
       logger.info(s"get userid $userid's identities")
       val path1 = "/home/fuyf/github/mychart/idea.png"
@@ -78,17 +79,29 @@ class UserAPI(implicit system: ActorSystem) extends LazyLogging {
   @ApiOperation(value = "post user identity", nickname = "post-user-identity", consumes = "multipart/form-data", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "userid", required = true, dataType = "integer", paramType = "path"),
+    new ApiImplicitParam(name = "identityid", required = true, dataType = "string", paramType = "form"),
     new ApiImplicitParam(name = "identity", required = true, dataType = "file", paramType = "form")
   ))
   def postUserXIdentityRoute = path("api" / "v1" / "user" / IntNumber / "identity") { userid =>
-    import com.heqiying.fundmng.gate.directives.FileDirective.FileInfoJsonSupport._
+    import com.heqiying.fundmng.gate.directives.MultipartFormDirective.FileInfoJsonSupport._
     post {
-      uploadFile { filemap =>
-        logger.info("Received files:")
-        filemap.foreach { tuple =>
-          logger.info(s"$tuple")
+      extractExecutionContext { implicit ec =>
+        collectFormData { datamapFuture =>
+          onComplete {
+            logger.info("Received multipart form data:")
+            datamapFuture.map { datamap =>
+              datamap.foreach { tuple =>
+                logger.info(s"$tuple")
+              }
+            }
+            datamapFuture
+          } {
+            case Success(r) => complete(r)
+            case Failure(e) =>
+              logger.error("", e)
+              complete((500, "internal server error"))
+          }
         }
-        complete(filemap)
       }
     }
   }
