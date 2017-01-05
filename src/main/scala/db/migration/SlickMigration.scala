@@ -26,7 +26,7 @@ class UnmanagedDatabase(conn: Connection) extends JdbcBackend.DatabaseDef(new Un
   override def createSession() = new UnmanagedSession(this)
 }
 
-trait SlickMigration extends JdbcMigration {
+trait SlickMigration { self: JdbcMigration =>
   def slickMigrate(db: UnmanagedDatabase)
 
   override def migrate(connection: Connection) = {
@@ -40,11 +40,23 @@ trait SlickMigration extends JdbcMigration {
   }
 }
 
-class V1__001_CreateUserTable extends SlickMigration {
+class V1__001_CreateUserTable extends JdbcMigration with SlickMigration {
   override def slickMigrate(db: UnmanagedDatabase): Unit = {
     val users = TableQuery[Users]
 
-    import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
-    Await.result(db.run(users.schema.create), 10.seconds)
+    import slick.driver.MySQLDriver.api._
+    val qs = users.schema.create.statements.map(sql => sqlu"""#$sql""").toSeq
+    Await.result(db.run(DBIO.seq(qs: _*)), 10.seconds)
+    //    Await.result(db.run(sqlu"""create table `users` (`username` VARCHAR(255) NOT NULL PRIMARY KEY,`password` VARCHAR(255) NOT NULL)"""), 10.seconds)
+  }
+}
+
+class V1_13__002_CreateUserIndexTable extends JdbcMigration with SlickMigration {
+  override def slickMigrate(db: UnmanagedDatabase): Unit = {
+    val users = TableQuery[Users]
+
+    import slick.driver.MySQLDriver.api._
+    //    Await.result(db.run(users.schema.create), 10.seconds)
+    Await.result(db.run(sqlu"""create unique index `idx_username` on `users` (`username`)"""), 10.seconds)
   }
 }
