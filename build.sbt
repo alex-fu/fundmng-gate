@@ -7,6 +7,7 @@ val root = project.in(file("."))
   .settings(resolverSettings)
   .settings(dependencySettings)
   .settings(testDependencySettings)
+  .settings(flywaySettings)
 //  .settings(wartRemoverSettings)
 //  .settings(coverageSettings)
 //  .settings(releaseSettings)
@@ -47,7 +48,8 @@ lazy val dependencySettings = {
         "com.typesafe.slick"      %% "slick"                     % slickV,
         "com.typesafe.slick"      %% "slick-hikaricp"            % slickV,
         "org.mariadb.jdbc"        %  "mariadb-java-client"       % "1.3.6",
-        "org.postgresql"          %  "postgresql"                % "9.4.1208"
+        "org.postgresql"          %  "postgresql"                % "9.4.1208",
+        "org.flywaydb"            %  "flyway-core"               % "4.0.3"
       )
         ++
       Seq(
@@ -65,6 +67,13 @@ lazy val dependencySettings = {
     ))
   )
 }
+
+lazy val flywaySettings = Seq(
+  flywayUrl := "jdbc:mysql://localhost:3306/fundmng",
+  flywayUser := "root",
+  flywayPassword := "root",
+  flywayLocations += "db.migration"
+)
 
 lazy val testDependencySettings = {
   libraryDependencies ++= (
