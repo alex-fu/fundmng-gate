@@ -17,6 +17,6 @@ object AppConfig {
 
   def fromConfig(config: Config): AppConfig = config.read[AppConfig]("fundmng-gate")
 
-  val config = ConfigFactory.load()
-  val fundmngGate: AppConfig = fromConfig(config)
+  lazy val config = ConfigFactory.load()
+  lazy val fundmngGate: AppConfig = fromConfig(config)
 }

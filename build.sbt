@@ -47,7 +47,8 @@ lazy val dependencySettings = {
         "com.typesafe.slick"      %% "slick"                     % slickV,
         "com.typesafe.slick"      %% "slick-hikaricp"            % slickV,
         "org.mariadb.jdbc"        %  "mariadb-java-client"       % "1.3.6",
-        "org.postgresql"          %  "postgresql"                % "9.4.1208"
+        "org.postgresql"          %  "postgresql"                % "9.4.1208",
+        "com.github.tototoshi"    %% "slick-joda-mapper"         % "2.1.0"
       )
         ++
       Seq(

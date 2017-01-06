@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.directives._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.RouteResult
 import akka.http.scaladsl.server.RouteResult._
-import com.heqiying.fundmng.gate.api.UserAPI
+import com.heqiying.fundmng.gate.api._
 import com.heqiying.fundmng.gate.common.LazyLogging
 
 class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
@@ -15,7 +15,7 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
 
   private[this] val routes = Seq(
     swaggerDocService.docsRoutes,
-    new UserAPI routes
+    new AdminAPI routes
   )
 
   val r0 = routes.reduceLeft { _ ~ _ }
