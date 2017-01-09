@@ -30,4 +30,10 @@ object AdminDAO extends LazyLogging {
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q.headOption)
   }
+
+  def delete(id: Int) = {
+    val q = adminsQ.filter(_.id === id).delete
+    sqlDebug(q.statements.mkString(";\n"))
+    db.run(q)
+  }
 }

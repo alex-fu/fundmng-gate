@@ -5,6 +5,8 @@ import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import slick.profile.SqlProfile.ColumnOption.Nullable
 import spray.json.{ DefaultJsonProtocol, RootJsonFormat }
 
+case class AdminID(adminId: Int)
+
 case class Admin(adminId: Option[Int], loginName: String, password: String, adminName: String,
   email: String, createAt: Long, updateAt: Option[Long])
 
@@ -62,6 +64,8 @@ class GroupAdminMappings(tag: Tag) extends Table[GroupAdminMapping](tag, "group_
 
   def foreignKeyAdminId = foreignKey("GA_ADMID_FK", adminId, DBSchema.admins)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
 
+  def idxGroupAdmin = index("idx_groupadmin", (groupId, adminId), unique = true)
+
   def * = (id.?, groupId, adminId) <> (GroupAdminMapping.tupled, GroupAdminMapping.unapply)
 }
 
@@ -84,7 +88,13 @@ class AuthorityGroupMappings(tag: Tag) extends Table[AuthorityGroupMapping](tag,
 
   def foreignKeyGroupId = foreignKey("AG_GRPID_FK", groupId, DBSchema.groups)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
 
+  def idxAuthorityGroup = index("idx_authoritygroup", (authorityId, groupId), unique = true)
+
   def * = (id.?, authorityId, groupId) <> (AuthorityGroupMapping.tupled, AuthorityGroupMapping.unapply)
+}
+
+object AdminIDJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
+  implicit val adminIdJsonFormat: RootJsonFormat[AdminID] = jsonFormat1(AdminID.apply)
 }
 
 object AdminJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

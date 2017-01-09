@@ -27,6 +27,7 @@ trait MySQLDB extends DBProfile {
 }
 
 object PostgresDB extends PostgresDB
+
 object MySQLDB extends MySQLDB
 
 object MainDBProfile {
