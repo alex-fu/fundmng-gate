@@ -1,0 +1,21 @@
+[
+  {
+    "authorityName": "AdminManage",
+    "authorityLabel": "管理员管理",
+    "regressionExpressions": [
+      {
+        "httpMethods": [
+          "GET"
+        ],
+        "pathExpression": "/api/v1/admins"
+      },
+      {
+        "httpMethods": [
+          "GET",
+          "POST"
+        ],
+        "pathExpression": "/api/v1/admins/(\\d+)"
+      }
+    ]
+  }
+]

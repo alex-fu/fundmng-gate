@@ -1,9 +1,12 @@
 package com.heqiying.fundmng.gate.dao
 
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.model.{ AdminID, DBSchema, Group, GroupAdminMapping }
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
+import com.heqiying.fundmng.gate.model.{ DBSchema, Group, GroupAdminMapping, Groups }
+
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object GroupDAO extends LazyLogging {
   private val groupsQ = DBSchema.groups
@@ -44,10 +47,13 @@ object GroupDAO extends LazyLogging {
     db.run(q)
   }
 
-  def postAdminsInGroup(groupId: Int, adminIds: Iterable[AdminID]) = {
-    val mappings = adminIds.map(adminId => GroupAdminMapping(None, groupId, adminId.adminId))
-    val q = groupAdminMappingsQ ++= mappings
-    sqlDebug(q.statements.mkString(";\n"))
+  def postAdminsInGroup(groupId: Int, adminIds: Iterable[Int]) = {
+    val q1 = groupAdminMappingsQ.filter(_.groupId === groupId).delete
+    val mappings = adminIds.map(adminId => GroupAdminMapping(None, groupId, adminId))
+    val q2 = groupAdminMappingsQ ++= mappings
+    val q = DBIO.seq(q1, q2).transactionally
+    sqlDebug(q1.statements.mkString(";\n"))
+    sqlDebug(q2.statements.mkString(";\n"))
     db.run(q)
   }
 
@@ -55,5 +61,30 @@ object GroupDAO extends LazyLogging {
     val q = groupAdminMappingsQ.filter(_.adminId === adminId).map(_.groupId).result
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q)
+  }
+
+  private def getInvestorGroup() = {
+    val q1 = groupsQ.filter(_.groupType === Groups.GroupTypeInvestor).result.headOption
+    sqlDebug(q1.statements.mkString(";\n"))
+    db.run(q1)
+  }
+
+  private def createInvestorGroup() = {
+    insert(Group(None, "GlobalInvestorGroup", Groups.GroupTypeInvestor))
+  }
+
+  def getOrCreateInvestorGroup(): Future[Option[Group]] = {
+    val r = for {
+      groupO <- getInvestorGroup()
+      if groupO.nonEmpty
+    } yield groupO
+
+    r.recoverWith {
+      case _ =>
+        for {
+          _ <- createInvestorGroup()
+          groupO <- getInvestorGroup()
+        } yield groupO
+    }
   }
 }

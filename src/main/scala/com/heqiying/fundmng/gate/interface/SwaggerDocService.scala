@@ -16,7 +16,8 @@ class SwaggerDocService(system: ActorSystem) extends SwaggerHttpService with Has
 
   override val apiTypes = Seq(
     typeOf[AdminAPI],
-    typeOf[GroupAPI]
+    typeOf[GroupAPI],
+    typeOf[AuthorityAPI]
   )
 
   val docsRoutes = get {

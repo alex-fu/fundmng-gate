@@ -16,7 +16,8 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
   private[this] val routes = Seq(
     swaggerDocService.docsRoutes,
     new AdminAPI routes,
-    new GroupAPI routes
+    new GroupAPI routes,
+    new AuthorityAPI routes
   )
 
   val r0 = routes.reduceLeft { _ ~ _ }

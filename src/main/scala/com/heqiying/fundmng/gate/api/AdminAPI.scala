@@ -67,7 +67,7 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
         case Success(None) =>
           complete(HttpResponse(StatusCodes.NotFound))
         case Failure(e) =>
-          logger.error(s"get admin by id failed: $e")
+          logger.error(s"get admin by id $adminid failed: $e")
           complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
       }
     }
@@ -87,7 +87,7 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
         onComplete(AdminDAO.update(adminid, password, adminName, email)) {
           case Success(r) => complete(HttpResponse(StatusCodes.OK))
           case Failure(e) =>
-            logger.error(s"update admin by id failed: $e")
+            logger.error(s"update admin by id $adminid failed: $e")
             complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
         }
       }
@@ -104,7 +104,7 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
       onComplete(AdminDAO.delete(adminid)) {
         case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
         case Failure(e) =>
-          logger.error(s"delete admin by id failed: $e")
+          logger.error(s"delete admin by id $adminid failed: $e")
           complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
       }
     }
@@ -129,7 +129,7 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
       onComplete(groups) {
         case Success(r) => complete(r)
         case Failure(e) =>
-          logger.error(s"get groups for admin failed: $e")
+          logger.error(s"get groups for admin $adminid failed: $e")
           complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
       }
     }

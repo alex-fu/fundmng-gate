@@ -3,23 +3,25 @@ package com.heqiying.fundmng.gate.model
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import slick.profile.SqlProfile.ColumnOption.Nullable
-import spray.json.{ DefaultJsonProtocol, RootJsonFormat }
-
-case class AdminID(adminId: Int)
+import spray.json._
 
 case class Admin(adminId: Option[Int], loginName: String, password: String, adminName: String,
   email: String, createAt: Long, updateAt: Option[Long])
 
-/**
- * groupType: "AdminGroup" or "InvestorGroup"
- */
 case class Group(groupId: Option[Int], groupName: String, groupType: String)
+
+object Groups {
+  val GroupTypeAdmin = "AdminGroup"
+  val GroupTypeInvestor = "InvestorGroup"
+}
 
 case class GroupAdminMapping(mappingId: Option[Int], groupId: Int, adminId: Int)
 
-case class Authority(authorityId: Option[Int], authorityName: String)
+case class AuthorityRegressionExpression(httpMethods: Seq[String], pathExpression: String)
 
-case class AuthorityGroupMapping(mappingId: Option[Int], authorityId: Int, groupId: Int)
+case class Authority(authorityName: String, authorityLabel: String, regressionExpressions: Seq[AuthorityRegressionExpression])
+
+case class AuthorityGroupMapping(mappingId: Option[Int], authorityName: String, groupId: Int)
 
 class Admins(tag: Tag) extends Table[Admin](tag, "admins") {
   def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
@@ -70,31 +72,46 @@ class GroupAdminMappings(tag: Tag) extends Table[GroupAdminMapping](tag, "group_
 }
 
 class Authorities(tag: Tag) extends Table[Authority](tag, "authorities") {
-  def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
+  def authorityName = column[String]("authority_name", O.Length(255, varying = true), O.PrimaryKey)
 
-  def authorityName = column[String]("authority_name", O.Length(255, varying = true))
+  def authorityLabel = column[String]("authority_label", O.Length(255, varying = true))
 
-  def * = (id.?, authorityName) <> (Authority.tupled, Authority.unapply)
+  /**
+   * regressionExpressions: use json string
+   */
+  def regressionExpressions = column[String]("regression_expressions", Nullable)
+
+  import Authorities._
+  def * = (authorityName, authorityLabel, regressionExpressions) <> (toAuthority, fromAuthority)
+}
+
+object Authorities {
+  import AuthorityRegressionExpressionJsonSupport._
+  def toAuthority(t: Tuple3[String, String, String]): Authority = {
+    val (name, label, re) = t
+    val reSeq = re.parseJson.convertTo[Seq[AuthorityRegressionExpression]]
+    Authority(name, label, reSeq)
+  }
+
+  def fromAuthority(authority: Authority): Option[Tuple3[String, String, String]] = {
+    require(authority.authorityName.nonEmpty)
+    require(authority.authorityLabel.nonEmpty)
+    Some((authority.authorityName, authority.authorityLabel, authority.regressionExpressions.toJson.compactPrint))
+  }
 }
 
 class AuthorityGroupMappings(tag: Tag) extends Table[AuthorityGroupMapping](tag, "authority_group_mappings") {
   def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
-  def authorityId = column[Int]("authority_id")
+  def authorityName = column[String]("authority_name", O.Length(255, varying = true))
 
   def groupId = column[Int]("group_id")
 
-  def foreignKeyAuthorityId = foreignKey("AG_AUTHID_FK", authorityId, DBSchema.authorities)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
-
   def foreignKeyGroupId = foreignKey("AG_GRPID_FK", groupId, DBSchema.groups)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
 
-  def idxAuthorityGroup = index("idx_authoritygroup", (authorityId, groupId), unique = true)
+  def idxAuthorityGroup = index("idx_authoritygroup", (authorityName, groupId), unique = true)
 
-  def * = (id.?, authorityId, groupId) <> (AuthorityGroupMapping.tupled, AuthorityGroupMapping.unapply)
-}
-
-object AdminIDJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val adminIdJsonFormat: RootJsonFormat[AdminID] = jsonFormat1(AdminID.apply)
+  def * = (id.?, authorityName, groupId) <> (AuthorityGroupMapping.tupled, AuthorityGroupMapping.unapply)
 }
 
 object AdminJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
@@ -105,7 +122,12 @@ object GroupJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
   implicit val groupJsonFormat: RootJsonFormat[Group] = jsonFormat3(Group.apply)
 }
 
+object AuthorityRegressionExpressionJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
+  implicit val regressionExpressionJsonFormat: RootJsonFormat[AuthorityRegressionExpression] = jsonFormat2(AuthorityRegressionExpression.apply)
+}
+
 object AuthorityJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val authorityJsonFormat: RootJsonFormat[Authority] = jsonFormat2(Authority.apply)
+  import AuthorityRegressionExpressionJsonSupport.regressionExpressionJsonFormat
+  implicit val authorityJsonFormat: RootJsonFormat[Authority] = jsonFormat3(Authority.apply)
 }
 
