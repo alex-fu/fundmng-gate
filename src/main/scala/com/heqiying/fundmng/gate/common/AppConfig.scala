@@ -11,7 +11,7 @@ object AppConfig {
 
   case class AdminConfig(name: String, port: Int)
   case class ApiConfig(security: SecurityConfig, `private`: PrivateConfig)
-  case class SecurityConfig(authentication: Boolean, algo: String, userSalt: String)
+  case class SecurityConfig(authentication: Boolean, algo: String, userSalt: String, domain: String)
   case class PrivateConfig(allowAllAddress: Boolean, allowedAddresses: List[String])
   case class RDSConfig(`type`: String)
 

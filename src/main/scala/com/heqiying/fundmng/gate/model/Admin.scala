@@ -6,7 +6,9 @@ import slick.profile.SqlProfile.ColumnOption.Nullable
 import spray.json._
 
 case class Admin(adminId: Option[Int], loginName: String, password: String, adminName: String,
-  email: String, createAt: Long, updateAt: Option[Long])
+  email: String, wxid: Option[String], createAt: Long, updateAt: Option[Long])
+
+case class Accesser(loginName: String, name: Option[String], email: Option[String], wxid: Option[String])
 
 case class Group(groupId: Option[Int], groupName: String, groupType: String)
 
@@ -34,13 +36,15 @@ class Admins(tag: Tag) extends Table[Admin](tag, "admins") {
 
   def email = column[String]("email", O.Length(127, varying = true))
 
+  def wxid = column[String]("wxid", Nullable)
+
   def createdAt = column[Long]("created_at")
 
   def updatedAt = column[Long]("updated_at", Nullable)
 
   def idxLoginName = index("idx_loginName", loginName, unique = true)
 
-  def * = (id.?, loginName, password, adminName, email, createdAt, updatedAt.?) <> (Admin.tupled, Admin.unapply)
+  def * = (id.?, loginName, password, adminName, email, wxid.?, createdAt, updatedAt.?) <> (Admin.tupled, Admin.unapply)
 }
 
 class Groups(tag: Tag) extends Table[Group](tag, "groups") {
@@ -115,7 +119,11 @@ class AuthorityGroupMappings(tag: Tag) extends Table[AuthorityGroupMapping](tag,
 }
 
 object AdminJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val adminJsonFormat: RootJsonFormat[Admin] = jsonFormat7(Admin.apply)
+  implicit val adminJsonFormat: RootJsonFormat[Admin] = jsonFormat8(Admin.apply)
+}
+
+object AccesserJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
+  implicit val accesserJsonFormat = jsonFormat4(Accesser.apply)
 }
 
 object GroupJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

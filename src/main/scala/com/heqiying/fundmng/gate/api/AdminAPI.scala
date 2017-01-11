@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.{ AdminDAO, GroupDAO }
-import com.heqiying.fundmng.gate.model.{ Admin, GroupAdminMapping }
+import com.heqiying.fundmng.gate.model.Admin
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
 import scala.concurrent.Future
@@ -36,13 +36,14 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
     new ApiImplicitParam(name = "loginName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
     new ApiImplicitParam(name = "password", required = true, dataType = "string", paramType = "form", defaultValue = ""),
     new ApiImplicitParam(name = "adminName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = "")
+    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = ""),
+    new ApiImplicitParam(name = "wxid", required = false, dataType = "string", paramType = "form", defaultValue = "")
   ))
   def postRoute = path("api" / "v1" / "admins") {
     import com.heqiying.fundmng.gate.model.AdminJsonSupport._
     post {
-      formFields(('loginName, 'password, 'adminName, 'email)) { (loginName, password, adminName, email) =>
-        val admin = Admin(None, loginName, password, adminName, email, System.currentTimeMillis(), None)
+      formFields(('loginName, 'password, 'adminName, 'email, 'wxid.?)) { (loginName, password, adminName, email, wxid) =>
+        val admin = Admin(None, loginName, password, adminName, email, wxid, System.currentTimeMillis(), None)
         logger.debug(s"Add new admin: ${admin.toString}")
         onComplete(AdminDAO.insert(admin)) {
           case Success(_) => complete(admin)
@@ -79,12 +80,13 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
     new ApiImplicitParam(name = "adminId", required = true, dataType = "integer", paramType = "path", defaultValue = ""),
     new ApiImplicitParam(name = "password", required = true, dataType = "string", paramType = "form", defaultValue = ""),
     new ApiImplicitParam(name = "adminName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = "")
+    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = ""),
+    new ApiImplicitParam(name = "wxid", required = false, dataType = "string", paramType = "form", defaultValue = "")
   ))
   def putXRoute = path("api" / "v1" / "admins" / IntNumber) { adminid =>
     put {
-      formFields(('password, 'adminName, 'email)) { (password, adminName, email) =>
-        onComplete(AdminDAO.update(adminid, password, adminName, email)) {
+      formFields(('password, 'adminName, 'email, 'wxid.?)) { (password, adminName, email, wxid) =>
+        onComplete(AdminDAO.update(adminid, password, adminName, email, wxid)) {
           case Success(r) => complete(HttpResponse(StatusCodes.OK))
           case Failure(e) =>
             logger.error(s"update admin by id $adminid failed: $e")
@@ -117,6 +119,7 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
   ))
   def getAdminGroupsRoute = path("api" / "v1" / "admins" / IntNumber / "groups") { adminid =>
     import com.heqiying.fundmng.gate.model.GroupJsonSupport._
+
     import scala.concurrent.ExecutionContext.Implicits.global
     get {
       val groupIds = GroupDAO.getGroupsForAdmin(adminid)

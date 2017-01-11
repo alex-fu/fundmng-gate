@@ -1,5 +1,9 @@
 package com.heqiying.fundmng.gate.api
 
+/**
+ * This file is only for POC, not needed in fundmng-gate project
+ */
+
 import javax.ws.rs.Path
 
 import akka.actor.ActorSystem

@@ -18,15 +18,21 @@ object AdminDAO extends LazyLogging {
     db.run(q)
   }
 
-  def update(adminId: Int, password: String, adminName: String, email: String) = {
-    val q = adminsQ.filter(_.id === adminId).map(x => (x.password, x.adminName, x.email))
-      .update(password, adminName, email)
+  def update(adminId: Int, password: String, adminName: String, email: String, wxid: Option[String]) = {
+    val q = adminsQ.filter(_.id === adminId).map(x => (x.password, x.adminName, x.email, x.wxid))
+      .update(password, adminName, email, wxid.getOrElse(""))
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q)
   }
 
   def getOne(id: Int) = {
     val q = adminsQ.filter(_.id === id).result
+    sqlDebug(q.statements.mkString(";\n"))
+    db.run(q.headOption)
+  }
+
+  def getOneByLoginName(loginName: String) = {
+    val q = adminsQ.filter(_.loginName === loginName).result
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q.headOption)
   }

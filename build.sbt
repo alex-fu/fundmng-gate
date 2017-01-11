@@ -34,7 +34,8 @@ lazy val dependencySettings = {
       ).map(_ % akkaV)
         ++
       Seq(
-        "com.typesafe.akka" %% "akka-http" % akkaHttpV
+        "com.typesafe.akka" %% "akka-http" % akkaHttpV,
+        "io.igl"            %% "jwt"       % "1.2.0"
       )
         ++
       Seq(
