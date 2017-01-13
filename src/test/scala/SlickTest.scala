@@ -10,7 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.io.Source
 
-object SlickTest extends App {
+object GenInitTableSqls extends App {
   val schemaSqls =
     DBSchema.admins.schema.createStatements ++
       DBSchema.groups.schema.createStatements ++
@@ -26,6 +26,18 @@ object SlickTest extends App {
   writer.close()
 
   Source.fromFile(outputFile).foreach(print)
+}
+
+object InitTable extends App {
+  val schemaSqls = Seq(
+    DBSchema.admins.schema.create,
+    DBSchema.groups.schema.create,
+    DBSchema.authorities.schema.create,
+    DBSchema.authorityGroupMapping.schema.create,
+    DBSchema.groupAdminMappings.schema.create
+  )
+
+  Await.result(schemaSqls.foldLeft(FastFuture.successful[Any](()))((fs, x) => fs.flatMap(_ => db.run(x))), Duration.Inf)
 }
 
 object InitData extends App {

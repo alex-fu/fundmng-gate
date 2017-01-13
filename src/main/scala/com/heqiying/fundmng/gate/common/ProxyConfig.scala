@@ -4,8 +4,11 @@ import spray.json._
 
 import scala.io.Source
 import scala.util.Try
+import scala.util.matching.Regex
 
 object ProxyConfig extends LazyLogging {
+  private[this] val patternStrings = AppConfig.fundmngGate.route.patterns
+  private[this] val patterns = patternStrings.map(x => s"""$x""".r)
 
   case class ProxyRoute(serviceHost: String, servicePort: Int, pathPrefixes: Seq[String])
 
@@ -13,7 +16,7 @@ object ProxyConfig extends LazyLogging {
     implicit def proxyRouteJsonFormat = jsonFormat3(ProxyRoute.apply)
   }
 
-  val rawProxyRoutes = {
+  private[this] val rawProxyRoutes = {
     val stream = getClass.getResourceAsStream("/proxyRoutes.json")
     import ProxyRouteJsonSupport._
     val proxyRoutes = Source.fromInputStream(stream).mkString.replaceAll("\n", "").parseJson.convertTo[Seq[ProxyRoute]]
@@ -22,7 +25,7 @@ object ProxyConfig extends LazyLogging {
     proxyRoutes
   }
 
-  val proxyRoutes = {
+  private[this] val proxyRoutes: Map[String, (String, Int)] = {
     val r = for {
       ProxyRoute(host, port, uris) <- rawProxyRoutes
       uri <- uris
@@ -35,18 +38,41 @@ object ProxyConfig extends LazyLogging {
   }
 
   private[this] def getUriKey(uri: String): Seq[String] = {
-    Seq(
-      extractUriKey(uri),
-      uri
-    )
+    def matchPattern(p: Regex, uri: String): Option[String] = {
+      uri match {
+        case p(x) => Some(x)
+        case _ => None
+      }
+    }
+    patterns.flatMap(matchPattern(_, uri))
   }
 
-  private[this] def extractUriKey(uri: String): String = {
-    ""
+  def debugRawProxyRoute() = {
+    def _debugRawProxyRoute(r: Seq[ProxyRoute]) = {
+      import ProxyRouteJsonSupport._
+      logger.debug(r.toJson.prettyPrint)
+    }
+    _debugRawProxyRoute(rawProxyRoutes)
   }
 
-  def debugRawProxyRoute(r: Seq[ProxyRoute]) = {
-    import ProxyRouteJsonSupport._
-    logger.debug(r.toJson.prettyPrint)
+  def debugProxyRoute() = {
+    def _debugProxyRoute(r: Map[String, (String, Int)]) = {
+      def mkString(r: Map[String, (String, Int)]) = {
+        val logsb = new StringBuilder
+        logsb.append("\n" + "-" * 60 + "\nProxy Routes:\n")
+        logsb.append("-" * 60 + "\n")
+        r.foreach {
+          case (key, serverinfo) =>
+            logsb.append(key)
+            logsb.append(" => ")
+            logsb.append(serverinfo)
+            logsb.append("\n")
+        }
+        logsb.append("-" * 60)
+        logsb.mkString
+      }
+      logger.debug(mkString(r))
+    }
+    _debugProxyRoute(proxyRoutes)
   }
 }

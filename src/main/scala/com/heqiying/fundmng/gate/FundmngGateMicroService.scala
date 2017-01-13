@@ -18,8 +18,7 @@ object FundmngGateMicroService extends App with LazyLogging {
   implicit val timeout = 10.seconds
 
   // load proxy routes at startup
-  ProxyConfig.debugRawProxyRoute(ProxyConfig.rawProxyRoutes)
-  val _ = ProxyConfig.proxyRoutes
+  ProxyConfig.debugProxyRoute()
 
   val apiInterface = new ApiHttpInterface()
   val routeInterface = new RouteHttpInterface()

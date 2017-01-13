@@ -2,21 +2,21 @@ package com.heqiying.fundmng.gate.interface
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
-import com.heqiying.fundmng.gate.common.{LazyLogging, ProxyConfig}
-import com.heqiying.fundmng.gate.dao.{AuthorityDAO, GroupDAO}
+import akka.stream.scaladsl.{ Sink, Source }
+import com.heqiying.fundmng.gate.common.{ LazyLogging, ProxyConfig }
+import com.heqiying.fundmng.gate.dao.{ AuthorityDAO, GroupDAO }
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.directives.ExtendPathMatchers
 import com.heqiying.fundmng.gate.model.Accesser
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{ Await, Future }
 
 class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) extends LazyLogging {
   private[this] def debugRoutePolicies(policies: Map[String, Set[String]]) = {
@@ -80,7 +80,9 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
   def proxy(uri: String, accesser: Accesser) = {
     val r = ProxyConfig.getProxyServer(uri)
     r match {
-      case Some((host, port)) => proxyTo(host, port, accesser)
+      case Some((host, port)) =>
+        logger.info(s"Proxy ${accesser.loginName}'s request on $uri to $host:$port")
+        proxyTo(host, port, accesser)
       case None => complete(HttpResponse(StatusCodes.NotFound))
     }
   }
