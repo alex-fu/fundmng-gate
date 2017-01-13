@@ -22,11 +22,29 @@ object AuthParams {
   val cookiePath = Some("/")
 }
 
-trait AuthDirective extends LazyLogging {
-  val authenticationRequired: Boolean
-  val JwtAlgo: String
-  val salt: String
-  val issuer: String
+object AuthDirective extends LazyLogging {
+  val authenticationRequired = AuthParams.authenticationRequired
+  val JwtAlgo = AuthParams.JwtAlgo
+  val salt = AuthParams.salt
+  val issuer = AuthParams.issuer
+
+  def buildJWT(accesser: Accesser): String = {
+    import com.heqiying.fundmng.gate.model.AccesserJsonSupport._
+
+    val subject = accesser.toJson.compactPrint
+    val iat = System.currentTimeMillis() / 1000L
+    val exp = iat + 3600 * 12 // 12 hours
+    val jwt = new DecodedJwt(Seq(
+      Alg(Algorithm.getAlgorithm(JwtAlgo).getOrElse(Algorithm.HS512)),
+      Typ("JWT")
+    ), Seq(
+      Iss(issuer),
+      Iat(iat),
+      Exp(exp),
+      Sub(subject)
+    ))
+    jwt.encodedAndSigned(salt)
+  }
 
   def authenticateJWT: Directive1[Option[Accesser]] = {
     if (authenticationRequired) {
@@ -52,7 +70,6 @@ trait AuthDirective extends LazyLogging {
                 import com.heqiying.fundmng.gate.model.AccesserJsonSupport._
                 for {
                   sub <- jwt.getClaim[Sub]
-                  exp <- jwt.getClaim[Exp] if exp.value > System.currentTimeMillis() / 1000L
                   accesser <- Try(sub.value.parseJson.convertTo[Accesser]).toOption
                 } yield accesser
               case Failure(e) =>
@@ -70,11 +87,7 @@ trait AuthDirective extends LazyLogging {
       provide(None)
     }
   }
+
+  val forbiddenDirective: Directive0 = Directive(_ => complete(HttpResponse(StatusCodes.Forbidden, entity = "Forbidden to access!")))
 }
 
-object AuthDirective extends AuthDirective {
-  val authenticationRequired = AuthParams.authenticationRequired
-  val JwtAlgo = AuthParams.JwtAlgo
-  val salt = AuthParams.salt
-  val issuer = AuthParams.issuer
-}

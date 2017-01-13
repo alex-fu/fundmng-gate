@@ -1,0 +1,18 @@
+[
+  {
+    "serviceHost": "localhost",
+    "servicePort": 7002,
+    "pathPrefixes": [
+      "/api/v1/funds",
+      "/api/v1/company"
+    ]
+  },
+  {
+    "serviceHost": "localhost",
+    "servicePort": 7003,
+    "pathPrefixes": [
+      "/api/v1/investors",
+      "/api/v1/boughtRecords"
+    ]
+  }
+]

@@ -1,20 +1,22 @@
 [
   {
-    "authorityName": "AdminManage",
-    "authorityLabel": "管理员管理",
-    "regressionExpressions": [
-      {
-        "httpMethods": [
-          "GET"
-        ],
-        "pathExpression": "/api/v1/admins"
-      },
+    "authorityName": "FundManage",
+    "authorityLabel": "基金产品管理",
+    "expressions": [
       {
         "httpMethods": [
           "GET",
           "POST"
         ],
-        "pathExpression": "/api/v1/admins/(\\d+)"
+        "pathExpression": "/api/v1/funds"
+      },
+      {
+        "httpMethods": [
+          "GET",
+          "PUT",
+          "DELETE"
+        ],
+        "pathExpression": "/api/v1/funds/{fundid}"
       }
     ]
   }

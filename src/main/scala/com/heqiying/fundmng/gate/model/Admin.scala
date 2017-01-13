@@ -8,20 +8,24 @@ import spray.json._
 case class Admin(adminId: Option[Int], loginName: String, password: String, adminName: String,
   email: String, wxid: Option[String], createAt: Long, updateAt: Option[Long])
 
-case class Accesser(loginName: String, name: Option[String], email: Option[String], wxid: Option[String])
+case class Accesser(id: Int, loginName: String, name: Option[String], email: Option[String], wxid: Option[String], groupType: String)
 
 case class Group(groupId: Option[Int], groupName: String, groupType: String)
 
 object Groups {
   val GroupTypeAdmin = "AdminGroup"
   val GroupTypeInvestor = "InvestorGroup"
+
+  val GroupNameInputer = "Inputer"
+  val GroupNameReviewer = "Reviewer"
+  val GroupNameSystemAdmin = "SystemAdmin"
 }
 
 case class GroupAdminMapping(mappingId: Option[Int], groupId: Int, adminId: Int)
 
-case class AuthorityRegressionExpression(httpMethods: Seq[String], pathExpression: String)
+case class AuthorityExpression(httpMethods: Seq[String], pathExpression: String)
 
-case class Authority(authorityName: String, authorityLabel: String, regressionExpressions: Seq[AuthorityRegressionExpression])
+case class Authority(authorityName: String, authorityLabel: String, expressions: Seq[AuthorityExpression])
 
 case class AuthorityGroupMapping(mappingId: Option[Int], authorityName: String, groupId: Int)
 
@@ -81,26 +85,26 @@ class Authorities(tag: Tag) extends Table[Authority](tag, "authorities") {
   def authorityLabel = column[String]("authority_label", O.Length(255, varying = true))
 
   /**
-   * regressionExpressions: use json string
+   * expressions: use json string
    */
-  def regressionExpressions = column[String]("regression_expressions", Nullable)
+  def expressions = column[String]("expressions", Nullable)
 
   import Authorities._
-  def * = (authorityName, authorityLabel, regressionExpressions) <> (toAuthority, fromAuthority)
+  def * = (authorityName, authorityLabel, expressions) <> (toAuthority, fromAuthority)
 }
 
 object Authorities {
   import AuthorityRegressionExpressionJsonSupport._
   def toAuthority(t: Tuple3[String, String, String]): Authority = {
     val (name, label, re) = t
-    val reSeq = re.parseJson.convertTo[Seq[AuthorityRegressionExpression]]
+    val reSeq = re.parseJson.convertTo[Seq[AuthorityExpression]]
     Authority(name, label, reSeq)
   }
 
   def fromAuthority(authority: Authority): Option[Tuple3[String, String, String]] = {
     require(authority.authorityName.nonEmpty)
     require(authority.authorityLabel.nonEmpty)
-    Some((authority.authorityName, authority.authorityLabel, authority.regressionExpressions.toJson.compactPrint))
+    Some((authority.authorityName, authority.authorityLabel, authority.expressions.toJson.compactPrint))
   }
 }
 
@@ -123,7 +127,7 @@ object AdminJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
 }
 
 object AccesserJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val accesserJsonFormat = jsonFormat4(Accesser.apply)
+  implicit val accesserJsonFormat = jsonFormat6(Accesser.apply)
 }
 
 object GroupJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
@@ -131,7 +135,7 @@ object GroupJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
 }
 
 object AuthorityRegressionExpressionJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val regressionExpressionJsonFormat: RootJsonFormat[AuthorityRegressionExpression] = jsonFormat2(AuthorityRegressionExpression.apply)
+  implicit val regressionExpressionJsonFormat: RootJsonFormat[AuthorityExpression] = jsonFormat2(AuthorityExpression.apply)
 }
 
 object AuthorityJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

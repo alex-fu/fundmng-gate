@@ -19,8 +19,8 @@ object AdminDAO extends LazyLogging {
   }
 
   def update(adminId: Int, password: String, adminName: String, email: String, wxid: Option[String]) = {
-    val q = adminsQ.filter(_.id === adminId).map(x => (x.password, x.adminName, x.email, x.wxid))
-      .update(password, adminName, email, wxid.getOrElse(""))
+    val q = adminsQ.filter(_.id === adminId).map(x => (x.password, x.adminName, x.email, x.wxid, x.updatedAt))
+      .update(password, adminName, email, wxid.getOrElse(""), System.currentTimeMillis())
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q)
   }

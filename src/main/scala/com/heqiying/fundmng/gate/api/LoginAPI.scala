@@ -7,38 +7,19 @@ import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.AdminDAO
-import com.heqiying.fundmng.gate.directives.AuthParams
-import com.heqiying.fundmng.gate.model.{ Admin, Accesser }
-import io.igl.jwt._
+import com.heqiying.fundmng.gate.directives.{ AuthDirective, AuthParams }
+import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
-import spray.json._
 
 import scala.util.{ Failure, Success }
 
 @Api(value = "Login API", produces = "application/json", protocols = "http")
 @Path("/api/v1/")
 class LoginAPI extends LazyLogging {
+
   import scala.concurrent.ExecutionContext.Implicits.global
 
   val routes = adminLoginRoute
-
-  def buildJWT(accesser: Accesser): String = {
-    import com.heqiying.fundmng.gate.model.AccesserJsonSupport._
-
-    val subject = accesser.toJson.compactPrint
-    val iat = System.currentTimeMillis() / 1000L
-    val exp = iat + 3600 * 12 // 12 hours
-    val jwt = new DecodedJwt(Seq(
-      Alg(Algorithm.getAlgorithm(AuthParams.JwtAlgo).getOrElse(Algorithm.HS512)),
-      Typ("JWT")
-    ), Seq(
-      Iss(AuthParams.issuer),
-      Iat(iat),
-      Exp(exp),
-      Sub(subject)
-    ))
-    jwt.encodedAndSigned(AuthParams.salt)
-  }
 
   @Path("/adminLogin")
   @ApiOperation(value = "Admin login", nickname = "admin-login", httpMethod = "POST")
@@ -55,8 +36,8 @@ class LoginAPI extends LazyLogging {
             case Some(admin) =>
               if (admin.password != password) Left("Wrong password!")
               else {
-                val adminless = Accesser(admin.loginName, Some(admin.adminName), Some(admin.email), admin.wxid)
-                Right(buildJWT(adminless))
+                val accesser = Accesser(admin.adminId.get, admin.loginName, Some(admin.adminName), Some(admin.email), admin.wxid, Groups.GroupTypeAdmin)
+                Right(AuthDirective.buildJWT(accesser))
               }
           }
         } {
@@ -71,5 +52,21 @@ class LoginAPI extends LazyLogging {
         }
       }
     }
+  }
+
+  @Path("/funds/{fundid}/testForForward")
+  @ApiOperation(value = "Test for forward", nickname = "test-for-forward", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "fundid", value = "", required = true, dataType = "integer", paramType = "path")
+  ))
+  def forwardRoute = {
+    complete("yes")
+  }
+
+  @Path("/funds")
+  @ApiOperation(value = "Test for funds", nickname = "test-for-funds", httpMethod = "GET")
+  def getFundsRoute = {
+    println("hhhhhhhhhhhhhhhhhhhhere")
+    complete("yes")
   }
 }

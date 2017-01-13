@@ -70,7 +70,7 @@ class AuthorityAPI extends LazyLogging {
   //  @ApiOperation(value = "upsert authorities", nickname = "upsert-authorities", httpMethod = "PUT")
   //  @ApiImplicitParams(Array(
   //    new ApiImplicitParam(name = "data", required = true, dataType = "string", paramType = "body",
-  //      value = """[{"authorityName":"AdminManage","authorityLabel":"管理员管理","regressionExpressions":[{"httpMethods":["GET"],"pathExpression":"/api/v1/admins"},{"httpMethods":["GET"],"pathExpression":"/api/v1/admins/(\\d+)"}]}]""")
+  //      value = """[{"authorityName":"FundManage","authorityLabel":"基金产品管理","expressions":[{"httpMethods":["GET","POST"],"pathExpression":"/api/v1/funds"},{"httpMethods":["GET","PUT","DELETE"],"pathExpression":"/api/v1/funds/{fundid}"}]}]""")
   //  ))
   //  def putRoute = path("api" / "v1" / "authorities") {
   //    import com.heqiying.fundmng.gate.model.AuthorityJsonSupport._
