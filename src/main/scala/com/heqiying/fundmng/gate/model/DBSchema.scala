@@ -8,4 +8,5 @@ object DBSchema {
   val authorities = TableQuery[Authorities]
   val groupAdminMappings = TableQuery[GroupAdminMappings]
   val authorityGroupMapping = TableQuery[AuthorityGroupMappings]
+  val accessRecords = TableQuery[AccessRecords]
 }
