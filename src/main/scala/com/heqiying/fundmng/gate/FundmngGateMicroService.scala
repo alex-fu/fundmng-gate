@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging }
-import com.heqiying.fundmng.gate.interface.{ ApiHttpInterface, RequestResponseLoggerInterface, RouteHttpInterface }
+import com.heqiying.fundmng.gate.interface.{ ApiHttpInterface, RequestResponseLoggerInterface, RouteHttpInterface, SwaggerDocService }
 import com.heqiying.fundmng.gate.common.ProxyConfig
 
 import scala.concurrent.Await
@@ -20,10 +20,11 @@ object FundmngGateMicroService extends App with LazyLogging {
   // load proxy routes at startup
   ProxyConfig.debugProxyRoute()
 
-  val apiInterface = new ApiHttpInterface()
+  val swaggerDocService = new SwaggerDocService(system, mat)
   val routeInterface = new RouteHttpInterface()
+  val apiInterface = new ApiHttpInterface()
 
-  val routes = RequestResponseLoggerInterface.logRoute(apiInterface.route ~ routeInterface.route)
+  val routes = RequestResponseLoggerInterface.logRoute(swaggerDocService.docsRoute ~ routeInterface.route ~ apiInterface.route)
   val httpBindingFuture = Http().bindAndHandle(routes, "0.0.0.0", AppConfig.fundmngGate.admin.port)
   logger.info(s"""Server online at http://0.0.0.0:${AppConfig.fundmngGate.admin.port}/ ...""")
 

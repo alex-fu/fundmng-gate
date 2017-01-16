@@ -88,6 +88,8 @@ object AuthDirective extends LazyLogging {
     }
   }
 
-  val forbiddenDirective: Directive0 = Directive(_ => complete(HttpResponse(StatusCodes.Forbidden, entity = "Forbidden to access!")))
+  val rejectDirective: Directive0 = Directive(_ => reject)
+  val forbiddenRoute = complete(HttpResponse(StatusCodes.Forbidden, entity = "Forbidden to access!"))
+  val notFoundRoute = complete(HttpResponse(StatusCodes.NotFound))
 }
 

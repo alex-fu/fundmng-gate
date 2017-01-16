@@ -14,8 +14,6 @@ import scala.util.Success
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
-  private[this] val swaggerDocService = new SwaggerDocService(system)
-
   private[this] val routes = Seq(
     new AdminAPI routes,
     new GroupAPI routes,
@@ -26,14 +24,14 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
   val r0 = routes.reduceLeft {
     _ ~ _
   }
-  val r1 = extractMethod { method =>
+  val route = extractMethod { method =>
     extractUri { uri =>
       if (uri.path.toString() != "/api/v1/adminLogin" && uri.path.toString() != "/api/v1/investorLogin") {
         AuthDirective.authenticateJWT { accesser: Option[Accesser] =>
           // fundmng-gate API is only accessible for SystemAdmin
           val r = accesser match {
             case Some(x) =>
-              logger.info(s"""Authenticated Accesser ${x.loginName} (${x.name}) request to ${method.value} ${uri.path.toString()}""")
+              logger.info(s"""Authenticated Accesser ${x.loginName}(${x.name.getOrElse("")}) request to ${method.value} ${uri.path.toString()}""")
               val r = for {
                 groupids <- GroupDAO.getGroupsForAdmin(x.id)
                 groupNames <- Future.sequence(groupids.map(GroupDAO.getOne)).map(_.flatten).map(_.map(_.groupName))
@@ -46,7 +44,7 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
             case Some(f) =>
               Await.ready(f, 10.seconds).value match {
                 case Some(Success(_)) => r0
-                case _ => AuthDirective.forbiddenDirective(r0)
+                case _ => AuthDirective.notFoundRoute
               }
             case None => r0
           }
@@ -56,5 +54,4 @@ class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
       }
     }
   }
-  val route = swaggerDocService.docsRoutes ~ r1
 }

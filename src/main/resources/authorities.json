@@ -1,5 +1,18 @@
 [
   {
+    "authorityName": "CompanyManage",
+    "authorityLabel": "基金公司管理",
+    "expressions": [
+      {
+        "httpMethods": [
+          "GET",
+          "PUT"
+        ],
+        "pathExpression": "/api/v1/company"
+      }
+    ]
+  },
+  {
     "authorityName": "FundManage",
     "authorityLabel": "基金产品管理",
     "expressions": [

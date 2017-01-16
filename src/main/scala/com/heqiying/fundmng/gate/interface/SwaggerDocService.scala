@@ -8,7 +8,7 @@ import com.github.swagger.akka.model.Info
 import com.heqiying.fundmng.gate.api._
 import com.heqiying.fundmng.gate.common.LazyLogging
 
-class SwaggerDocService(system: ActorSystem) extends SwaggerHttpService with HasActorSystem with LazyLogging {
+class SwaggerDocService(system: ActorSystem, mat: ActorMaterializer) extends SwaggerHttpService with HasActorSystem with LazyLogging {
   override implicit val actorSystem: ActorSystem = system
   override implicit val materializer: ActorMaterializer = ActorMaterializer()
   override val apiDocsPath = "api" //where you want the swagger-json endpoint exposed
@@ -21,7 +21,7 @@ class SwaggerDocService(system: ActorSystem) extends SwaggerHttpService with Has
     typeOf[LoginAPI]
   )
 
-  val docsRoutes = get {
+  val docsRoute = get {
     path("") {
       pathEndOrSingleSlash {
         logger.info("retrieve root swagger docs")

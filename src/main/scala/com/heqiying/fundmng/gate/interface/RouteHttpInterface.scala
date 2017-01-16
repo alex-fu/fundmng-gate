@@ -44,12 +44,14 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
           case "POST" => post
           case "PUT" => put
           case "DELETE" => delete
-          case _ => get
-        }.foldLeft(Directive.Empty)(_ | _)
+          case "OPTIONS" => options
+          case "PATCH" => patch
+          case _ => head
+        }.foldRight(rejectDirective)(_ | _)
       }
       policies.map {
         case (k, v) => path(ExtendPathMatchers.separateOnSlashes(k)) & methods(v)
-      }.foldRight(forbiddenDirective)(_ | _)
+      }.foldRight(rejectDirective)(_ | _)
     }
 
     authenticateJWT { accesser =>
@@ -69,35 +71,35 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
         policies match {
           case Some(x) =>
             forwardPolicy(Await.result(policies.get, 10.seconds)) {
-              proxy(uri.path.toString(), accesser.get)
+              proxy(uri.path.toString(), accesser)
             }
-          case _ => proxy(uri.path.toString(), accesser.get)
+          case _ => proxy(uri.path.toString(), accesser)
         }
       }
     }
   }
 
-  def proxy(uri: String, accesser: Accesser) = {
+  def proxy(uri: String, accesser: Option[Accesser]) = {
     val r = ProxyConfig.getProxyServer(uri)
     r match {
       case Some((host, port)) =>
-        logger.info(s"Proxy ${accesser.loginName}'s request on $uri to $host:$port")
+        logger.info(s"Proxy ${accesser.map(_.loginName).getOrElse("")}'s request on $uri to $host:$port")
         proxyTo(host, port, accesser)
       case None => complete(HttpResponse(StatusCodes.NotFound))
     }
   }
 
-  def proxyTo(host: String, port: Int, accesser: Accesser) = Route { (context: RequestContext) =>
+  def proxyTo(host: String, port: Int, accesser: Option[Accesser]) = Route { (context: RequestContext) =>
     val request = context.request
     val flow = Http(system).outgoingConnection(host, port)
     val handler = Source.single(context.request)
       .map(r => r.removeHeader("Timeout-Access").
-        addHeader(RawHeader("X-AccesserID", accesser.id.toString)).
-        addHeader(RawHeader("X-AccesserLoginName", accesser.loginName)).
-        addHeader(RawHeader("X-AccesserName", accesser.name.getOrElse(""))).
-        addHeader(RawHeader("X-AccesserEmail", accesser.email.getOrElse(""))).
-        addHeader(RawHeader("X-AccesserWxID", accesser.wxid.getOrElse(""))).
-        addHeader(RawHeader("X-AccesserType", accesser.groupType)))
+        addHeader(RawHeader("X-AccesserID", accesser.map(_.id).getOrElse(-1).toString)).
+        addHeader(RawHeader("X-AccesserLoginName", accesser.map(_.loginName).getOrElse(""))).
+        addHeader(RawHeader("X-AccesserName", accesser.flatMap(_.name).getOrElse(""))).
+        addHeader(RawHeader("X-AccesserEmail", accesser.flatMap(_.email).getOrElse(""))).
+        addHeader(RawHeader("X-AccesserWxID", accesser.flatMap(_.wxid).getOrElse(""))).
+        addHeader(RawHeader("X-AccesserType", accesser.map(_.groupType).getOrElse(""))))
       .via(flow)
       .runWith(Sink.head)
       .flatMap(context.complete(_))
