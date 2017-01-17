@@ -12,7 +12,7 @@ import com.heqiying.fundmng.gate.common.{ LazyLogging, ProxyConfig }
 import com.heqiying.fundmng.gate.dao.{ AuthorityDAO, GroupDAO }
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.directives.ExtendPathMatchers
-import com.heqiying.fundmng.gate.model.Accesser
+import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -57,10 +57,20 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
 
     authenticateJWT { accesser =>
       val policies = accesser match {
-        case Some(x) =>
+        case Some(x) if x.groupType == Groups.GroupTypeAdmin =>
           val r = for {
             groupids <- GroupDAO.getGroupsForAdmin(x.id)
             authorityNames <- Future.sequence(groupids.map(AuthorityDAO.getAuthoritiesInGroup)).map(_.flatten.toSet)
+            authorities <- Future.sequence(authorityNames.map(AuthorityDAO.getOne)).map(_.flatten.toSeq)
+            expressions <- Future(authorities.flatMap(_.expressions).
+              foldLeft(Map.empty[String, Set[String]])((m, x) => m + (x.pathExpression -> x.httpMethods.toSet)))
+          } yield expressions
+          Some(r)
+        case Some(x) if x.groupType == Groups.GroupTypeInvestor =>
+          val r = for {
+            group <- GroupDAO.getOrCreateInvestorGroup()
+            if group.nonEmpty
+            authorityNames <- AuthorityDAO.getAuthoritiesInGroup(group.flatMap(_.groupId).get)
             authorities <- Future.sequence(authorityNames.map(AuthorityDAO.getOne)).map(_.flatten.toSeq)
             expressions <- Future(authorities.flatMap(_.expressions).
               foldLeft(Map.empty[String, Set[String]])((m, x) => m + (x.pathExpression -> x.httpMethods.toSet)))
@@ -71,7 +81,7 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
       extractUri { uri =>
         policies match {
           case Some(x) =>
-            forwardPolicy(Await.result(policies.get, 10.seconds)) {
+            forwardPolicy(Try(Await.result(x, 10.seconds)).getOrElse(Map())) {
               proxy(uri.path.toString(), accesser)
             }
           case _ => proxy(uri.path.toString(), accesser)
