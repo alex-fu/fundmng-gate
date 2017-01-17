@@ -21,7 +21,7 @@ object GenInitTableSqls extends App {
 
   //  println(schemaSqls.mkString(";\n"))
 
-  val outputFile = "/home/fuyf/project/fundmng-flyway/sql/V1__CreateAdminTables.sql"
+  val outputFile = "/home/fuyf/project/fundmng-flyway/sql/V1__CreateGateTables.sql"
   val writer = new PrintWriter(new File(outputFile))
   writer.write(schemaSqls.mkString(";\n"))
   writer.close()
