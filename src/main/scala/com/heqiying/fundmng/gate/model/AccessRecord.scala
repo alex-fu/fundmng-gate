@@ -6,14 +6,14 @@ import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import slick.profile.SqlProfile.ColumnOption.Nullable
 import spray.json.DefaultJsonProtocol
 
-case class AccessRecord(id: Option[Int], time: Long, uri: String, method: String,
+case class AccessRecord(id: Option[Int], time: String, uri: String, method: String,
   who: Option[String], from: Option[String], jwt: Option[String],
   responseStatus: Int)
 
 class AccessRecords(tag: Tag) extends Table[AccessRecord](tag, "access_records") {
   def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
-  def time = column[Long]("time")
+  def time = column[String]("time", O.Length(31, varying = true))
 
   def uri = column[String]("uri", O.Length(255))
 

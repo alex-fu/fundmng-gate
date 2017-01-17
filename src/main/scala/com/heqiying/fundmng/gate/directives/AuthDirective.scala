@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.Directives._
 import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging }
 import com.heqiying.fundmng.gate.model.Accesser
 import io.igl.jwt._
+import org.apache.commons.codec.binary.Base64
 import spray.json._
 
 import scala.util.{ Failure, Success, Try }
@@ -20,13 +21,12 @@ object AuthParams {
   val cookieName = "_jwt"
   val cookieDomain = Some(AppConfig.fundmngGate.api.security.domain)
   val cookiePath = Some("/")
+
+  val tokenHeaderName = "X-Access-Token"
 }
 
 object AuthDirective extends LazyLogging {
-  val authenticationRequired = AuthParams.authenticationRequired
-  val JwtAlgo = AuthParams.JwtAlgo
-  val salt = AuthParams.salt
-  val issuer = AuthParams.issuer
+  import AuthParams._
 
   def buildJWT(accesser: Accesser): String = {
     import com.heqiying.fundmng.gate.model.AccesserJsonSupport._
@@ -46,17 +46,56 @@ object AuthDirective extends LazyLogging {
     jwt.encodedAndSigned(salt)
   }
 
-  def authenticateJWT: Directive1[Option[Accesser]] = {
+  def extractJWT: Directive1[Option[String]] = {
     if (authenticationRequired) {
-      val r = for {
-        cookiePair <- optionalCookie("_jwt")
-        token <- optionalHeaderValueByName("X-Access-Token")
+      for {
+        cookiePair <- optionalCookie(cookieName)
+        token <- optionalHeaderValueByName(tokenHeaderName)
       } yield {
-        val jwtOption = cookiePair.map(_.toCookie()) match {
+        cookiePair.map(_.toCookie()) match {
           case Some(cookie) => Some(cookie.value)
           case _ => token
         }
+      }
+    } else {
+      provide(None)
+    }
+  }
 
+  def extractAccesser: Directive1[Option[Accesser]] = {
+    for {
+      jwtOption <- extractJWT
+    } yield {
+      jwtOption.flatMap { jwtString =>
+        DecodedJwt.validateEncodedJwt(
+          jwtString,
+          salt,
+          Algorithm.getAlgorithm(JwtAlgo).getOrElse(Algorithm.HS512),
+          Set(Typ),
+          Set(Sub),
+          Set(),
+          Set(Iss.name, Iat.name, Exp.name),
+          iss = Some(Iss(issuer))
+        ) match {
+            case Success(jwt: Jwt) =>
+              import com.heqiying.fundmng.gate.model.AccesserJsonSupport._
+              for {
+                sub <- jwt.getClaim[Sub]
+                accesser <- Try(sub.value.parseJson.convertTo[Accesser]).toOption
+              } yield accesser
+            case Failure(e) =>
+              logger.info(s"jwt validate failed: $e")
+              None
+          }
+      }
+    }
+  }
+
+  def authenticateJWT: Directive1[Option[Accesser]] = {
+    if (authenticationRequired) {
+      val r = for {
+        jwtOption <- extractJWT
+      } yield {
         jwtOption.flatMap { jwtString =>
           DecodedJwt.validateEncodedJwt(
             jwtString,

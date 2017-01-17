@@ -3,7 +3,7 @@ package com.heqiying.fundmng.gate.interface
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
+import akka.http.scaladsl.model.{ HttpResponse, StatusCodes, Uri }
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
@@ -17,6 +17,7 @@ import com.heqiying.fundmng.gate.model.Accesser
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
+import scala.util.Try
 
 class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) extends LazyLogging {
   private[this] def debugRoutePolicies(policies: Map[String, Set[String]]) = {
@@ -90,8 +91,7 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
   }
 
   def proxyTo(host: String, port: Int, accesser: Option[Accesser]) = Route { (context: RequestContext) =>
-    val request = context.request
-    val flow = Http(system).outgoingConnection(host, port)
+    val flow = Http().outgoingConnection(host, port)
     val handler = Source.single(context.request)
       .map(r => r.removeHeader("Timeout-Access").
         addHeader(RawHeader("X-AccesserID", accesser.map(_.id).getOrElse(-1).toString)).
@@ -103,6 +103,8 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
       .via(flow)
       .runWith(Sink.head)
       .flatMap(context.complete(_))
-    handler
+    handler.recoverWith {
+      case e => context.complete(HttpResponse(StatusCodes.InternalServerError, entity = "Server is in maintain!"))
+    }
   }
 }
