@@ -35,6 +35,7 @@ lazy val dependencySettings = {
         ++
       Seq(
         "com.typesafe.akka" %% "akka-http" % akkaHttpV,
+        "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
         "io.igl"            %% "jwt"       % "1.2.0"
       )
         ++
@@ -58,7 +59,8 @@ lazy val dependencySettings = {
         "com.typesafe.scala-logging"    %% "scala-logging"          % "3.1.0",
         "org.slf4j"                     %  "jcl-over-slf4j"         % "1.7.12",
         "org.slf4j"                     %  "log4j-over-slf4j"       % "1.7.12",
-        "com.github.swagger-akka-http"  %  "swagger-akka-http_2.11" % "0.7.0"
+        "com.github.swagger-akka-http"  %  "swagger-akka-http_2.11" % "0.9.0",
+        "io.spray"                      %% "spray-json"         % "1.3.2"
       )
     ).map(_.excludeAll(
       ExclusionRule("commons-logging", "commons-logging"),
