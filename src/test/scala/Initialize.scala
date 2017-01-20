@@ -1,16 +1,20 @@
 import java.io.{File, PrintWriter}
 
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.model.RequestEntity
 import akka.http.scaladsl.util.FastFuture
+import com.heqiying.fundmng.gate.common.AppConfig
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import com.heqiying.fundmng.gate.model._
+import com.heqiying.fundmng.gate.model.activiti
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.io.Source
 
 object GenInitTableSqls extends App {
+  import scala.concurrent.ExecutionContext.Implicits.global
   val schemaSqls =
     DBSchema.admins.schema.createStatements ++
       DBSchema.groups.schema.createStatements ++
@@ -30,6 +34,7 @@ object GenInitTableSqls extends App {
 }
 
 object InitTable extends App {
+  import scala.concurrent.ExecutionContext.Implicits.global
   val schemaSqls = Seq(
     DBSchema.admins.schema.create,
     DBSchema.groups.schema.create,
@@ -43,10 +48,11 @@ object InitTable extends App {
 }
 
 object InitData extends App {
+  import scala.concurrent.ExecutionContext.Implicits.global
   val initData = Seq(
     // init admins
-    DBSchema.admins += Admin(None, "fuyf", "fuyf", "Yifeng", "fuyifeng@heqiying.com", None, System.currentTimeMillis(), None),
-    DBSchema.admins += Admin(None, "zy", "zy", "Zhaoyue", "zhaoyue@heqiying.com", None, System.currentTimeMillis(), None),
+    DBSchema.admins += Admin(None, "fuyf", "fuyf", "YiFeng", "fuyifeng@heqiying.com", None, System.currentTimeMillis(), None),
+    DBSchema.admins += Admin(None, "zy", "zy", "ZhaoYue", "zhaoyue@heqiying.com", None, System.currentTimeMillis(), None),
     DBSchema.admins += Admin(None, "zh", "zh", "ZhaoHui", "yinzhaohui@heqiying.com", None, System.currentTimeMillis(), None),
 
     // init groups
@@ -64,4 +70,18 @@ object InitData extends App {
   )
 
   Await.result(initData.foldLeft(FastFuture.successful[Any](()))((fs, x) => fs.flatMap(_ => db.run(x))), Duration.Inf)
+}
+
+object InitActivitiUserGroup extends App with ActivitiTestTool {
+  import activiti.UserJsonSupport._
+
+  def addUser(user: activiti.User) = {
+    val entity = Marshal(user).to[RequestEntity]
+    entity.map { e =>
+      post("/identity/users", Nil, e)
+    }
+  }
+//  addUser(activiti.User("zh", "ZhaoHui", "", "zhaohui@heqiying.com", Some(AppConfig.fundmngGate.activiti.defaultPassword), None))
+  addUser(activiti.User("zy", "ZhaoYue", "", "zhaoyue@heqiying.com", Some(AppConfig.fundmngGate.activiti.defaultPassword), None))
+//  addUser(activiti.User("fuyf", "YiFeng", "", "fuyifeng@heqiying.com", Some(AppConfig.fundmngGate.activiti.defaultPassword), None))
 }

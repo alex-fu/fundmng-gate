@@ -5,9 +5,12 @@ import javax.ws.rs.Path
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
+import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.{ AdminDAO, AuthorityDAO, GroupDAO }
+import com.heqiying.fundmng.gate.dao.{ ActiIdentityRPC, AdminDAO, AuthorityDAO, GroupDAO }
 import com.heqiying.fundmng.gate.model.{ Authority, Group, Groups }
+import com.heqiying.fundmng.gate.directives.AuthDirective._
+import com.heqiying.fundmng.gate.interface.ActivitiInterface
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
 import scala.concurrent.Future
@@ -15,8 +18,8 @@ import scala.util.{ Failure, Success }
 
 @Api(value = "Group API", produces = "application/json")
 @Path("/api/v1/groups")
-class GroupAPI(implicit system: ActorSystem) extends LazyLogging {
-  val routes = getRoute ~ postRoute ~ getXRoute ~ putXRoute ~ deleteXRoute ~
+class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
+  val routes = getRoute ~ postRoute ~ getXRoute ~ deleteXRoute ~
     getGroupAdminsRoute ~ putGroupAdminsRoute ~
     getGroupAuthoritiesRoute ~ putGroupAuthoritiesRoute ~
     getInvestorGroupAuthoritiesRoute ~ putInvestorGroupAuthoritiesRoute
@@ -43,13 +46,16 @@ class GroupAPI(implicit system: ActorSystem) extends LazyLogging {
     import com.heqiying.fundmng.gate.model.GroupJsonSupport._
     post {
       formFields('groupName) { groupName =>
-        val group = Group(None, groupName, Groups.GroupTypeAdmin)
-        logger.debug(s"Add new group: ${group.toString}")
-        onComplete(GroupDAO.insert(group)) {
-          case Success(r) => complete(group)
-          case Failure(e) =>
-            logger.error(s"post groups failed: $e")
-            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        extractAccesser { accesser =>
+          val group = Group(None, groupName, Groups.GroupTypeAdmin)
+          logger.debug(s"Add new group: ${group.toString}")
+          val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+          onComplete(GroupDAO.insert(group, actiRPC)) {
+            case Success(r) => complete(group)
+            case Failure(e) =>
+              logger.error(s"post groups failed: $e")
+              complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+          }
         }
       }
     }
@@ -73,6 +79,7 @@ class GroupAPI(implicit system: ActorSystem) extends LazyLogging {
     }
   }
 
+  // Obsolete: don't allow to update group, only can create & delete group
   @Path("/{groupid}")
   @ApiOperation(value = "update group", nickname = "update-group", consumes = "application/x-www-form-urlencoded", httpMethod = "PUT")
   @ApiImplicitParams(Array(
@@ -100,11 +107,14 @@ class GroupAPI(implicit system: ActorSystem) extends LazyLogging {
   ))
   def deleteXRoute = path("api" / "v1" / "groups" / IntNumber) { groupid =>
     delete {
-      onComplete(GroupDAO.delete(groupid)) {
-        case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
-        case Failure(e) =>
-          logger.error(s"delete group by id $groupid failed: $e")
-          complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+      extractAccesser { accesser =>
+        val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+        onComplete(GroupDAO.delete(groupid, actiRPC)) {
+          case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
+          case Failure(e) =>
+            logger.error(s"delete group by id $groupid failed: $e")
+            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        }
       }
     }
   }
@@ -146,11 +156,14 @@ class GroupAPI(implicit system: ActorSystem) extends LazyLogging {
     import spray.json.DefaultJsonProtocol._
     put {
       entity(as[Seq[Int]]) { adminIds =>
-        onComplete(GroupDAO.postAdminsInGroup(groupid, adminIds)) {
-          case Success(r) => complete(HttpResponse(StatusCodes.OK))
-          case Failure(e) =>
-            logger.error(s"post admins to group $groupid failed: $e")
-            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        extractAccesser { accesser =>
+          val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+          onComplete(GroupDAO.postAdminsInGroup(groupid, adminIds, actiRPC)) {
+            case Success(r) => complete(HttpResponse(StatusCodes.OK))
+            case Failure(e) =>
+              logger.error(s"post admins to group $groupid failed: $e")
+              complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+          }
         }
       }
     }

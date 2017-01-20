@@ -1,9 +1,9 @@
 package com.heqiying.fundmng.gate.common
 
-import com.heqiying.fundmng.gate.common.AppConfig.{ AdminConfig, ApiConfig, RDSConfig, RouteConfig }
+import com.heqiying.fundmng.gate.common.AppConfig._
 import com.typesafe.config.ConfigFactory
 
-case class AppConfig(admin: AdminConfig, api: ApiConfig, route: RouteConfig, rds: RDSConfig)
+case class AppConfig(admin: AdminConfig, api: ApiConfig, route: RouteConfig, activiti: ActivitiConfig, rds: RDSConfig)
 
 object AppConfig {
   import com.typesafe.config.Config
@@ -14,6 +14,7 @@ object AppConfig {
   case class SecurityConfig(authentication: Boolean, algo: String, userSalt: String, domain: String)
   case class PrivateConfig(allowAllAddress: Boolean, allowedAddresses: List[String])
   case class RouteConfig(patterns: List[String])
+  case class ActivitiConfig(host: String, port: Int, baseUri: String, defaultPassword: String)
   case class RDSConfig(`type`: String)
 
   def fromConfig(config: Config): AppConfig = config.read[AppConfig]("fundmng-gate")

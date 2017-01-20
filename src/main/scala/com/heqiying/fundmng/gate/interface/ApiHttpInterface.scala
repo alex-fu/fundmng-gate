@@ -2,6 +2,7 @@ package com.heqiying.fundmng.gate.interface
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
+import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.api._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.GroupDAO
@@ -13,7 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
 import scala.util.Success
 
-class ApiHttpInterface(implicit system: ActorSystem) extends LazyLogging {
+class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
   private[this] val routes = Seq(
     new AdminAPI routes,
     new GroupAPI routes,

@@ -1,5 +1,6 @@
 package com.heqiying.fundmng.gate.dao
 
+import akka.http.scaladsl.model.StatusCodes
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
@@ -16,10 +17,19 @@ object GroupDAO extends LazyLogging {
     db.run(groupsQ.result)
   }
 
-  def insert(group: Group) = {
-    val q = groupsQ += group
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q)
+  def insert(group: Group, actiRPCO: Option[ActiIdentityRPC]) = {
+    val q1 = groupsQ += group
+    sqlDebug(q1.statements.mkString(";\n"))
+    val q = actiRPCO match {
+      case Some(actiRPC) =>
+        for {
+          r <- q1
+          r1 <- DBIO.from(actiRPC.createGroup(group.groupName, group.groupName, group.groupType))
+          if Seq(StatusCodes.Created, StatusCodes.Conflict) contains r1.status
+        } yield r
+      case None => q1
+    }
+    db.run(q.transactionally)
   }
 
   def update(groupId: Int, groupName: String, groupType: String) = {
@@ -35,10 +45,21 @@ object GroupDAO extends LazyLogging {
     db.run(q.headOption)
   }
 
-  def delete(id: Int) = {
-    val q = groupsQ.filter(_.id === id).delete
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q)
+  def delete(id: Int, actiRPCO: Option[ActiIdentityRPC]) = {
+    val q1 = groupsQ.filter(_.id === id).result.head
+    val q2 = groupsQ.filter(_.id === id).delete
+    sqlDebug(q2.statements.mkString(";\n"))
+    val q = actiRPCO match {
+      case Some(actiRPC) =>
+        for {
+          group <- q1
+          r <- q2
+          r1 <- DBIO.from(actiRPC.deleteGroup(group.groupName))
+          if Seq(StatusCodes.NoContent, StatusCodes.NotFound) contains r1.status
+        } yield r
+      case None => q2
+    }
+    db.run(q.transactionally)
   }
 
   def getAdminsInGroup(groupId: Int) = {
@@ -47,14 +68,40 @@ object GroupDAO extends LazyLogging {
     db.run(q)
   }
 
-  def postAdminsInGroup(groupId: Int, adminIds: Iterable[Int]) = {
+  def postAdminsInGroup(groupId: Int, adminIds: Iterable[Int], actiRPCO: Option[ActiIdentityRPC]) = {
+    val q0 = groupAdminMappingsQ.filter(_.groupId === groupId).result
     val q1 = groupAdminMappingsQ.filter(_.groupId === groupId).delete
     val mappings = adminIds.map(adminId => GroupAdminMapping(None, groupId, adminId))
     val q2 = groupAdminMappingsQ ++= mappings
-    val q = DBIO.seq(q1, q2).transactionally
+    sqlDebug(q0.statements.mkString(";\n"))
     sqlDebug(q1.statements.mkString(";\n"))
     sqlDebug(q2.statements.mkString(";\n"))
-    db.run(q)
+
+    def zipGroupAdmin(mappings: Iterable[GroupAdminMapping]): Future[Iterable[(String, String)]] = {
+      Future.sequence(
+        mappings.map {
+          case GroupAdminMapping(_, gid, aid) =>
+            for {
+              a <- AdminDAO.getOne(aid) if a.nonEmpty
+              g <- GroupDAO.getOne(gid) if g.nonEmpty
+            } yield (g.get.groupName, a.get.loginName)
+        }
+      )
+    }
+    val q = actiRPCO match {
+      case Some(actiRPC) =>
+        for {
+          ms <- q0
+          _ <- q1
+          _ <- q2
+          r1 <- DBIO.from(zipGroupAdmin(ms).flatMap(xs => Future.sequence(xs.map(ys => actiRPC.deleteMemberFromGroup(ys._1, ys._2)))))
+          if r1.forall(r => Seq(StatusCodes.NoContent, StatusCodes.NotFound).contains(r.status))
+          r2 <- DBIO.from(zipGroupAdmin(mappings).flatMap(xs => Future.sequence(xs.map(ys => actiRPC.addMemberToGroup(ys._1, ys._2)))))
+          if r2.forall(r => Seq(StatusCodes.Created, StatusCodes.Conflict).contains(r.status))
+        } yield ()
+      case None => DBIO.seq(q1, q2)
+    }
+    db.run(q.transactionally)
   }
 
   def getGroupsForAdmin(adminId: Int) = {
@@ -70,7 +117,8 @@ object GroupDAO extends LazyLogging {
   }
 
   private def createInvestorGroup() = {
-    insert(Group(None, "GlobalInvestorGroup", Groups.GroupTypeInvestor))
+    // we don't need to add investor group to activiti now
+    insert(Group(None, "GlobalInvestorGroup", Groups.GroupTypeInvestor), None)
   }
 
   def getOrCreateInvestorGroup(): Future[Option[Group]] = {

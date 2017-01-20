@@ -12,7 +12,7 @@ import com.heqiying.fundmng.gate.dao.AccessRecordDAO
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.model.{ AccessRecord, Accesser }
 
-object RequestResponseLoggerInterface {
+object HttpLoggerInterface {
   val logRoute = { route: Route =>
     (extractJWT & extractAccesser & extractUri & extractMethod & extractClientIP) { (jwt, accesser, uri, method, clientip) =>
       DebuggingDirectives.logRequestResult(showLogs(uri, method, clientip, accesser, jwt) _) {

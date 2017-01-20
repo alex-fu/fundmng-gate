@@ -25,7 +25,7 @@ object FundmngGateMicroService extends App with LazyLogging {
   val routeInterface = new RouteHttpInterface()
   val apiInterface = new ApiHttpInterface()
 
-  val routes = RequestResponseLoggerInterface.logRoute(swaggerDocService.docsRoute ~
+  val routes = HttpLoggerInterface.logRoute(swaggerDocService.docsRoute ~
     loginInterface.route ~ routeInterface.route ~ apiInterface.route)
   val httpBindingFuture = Http().bindAndHandle(routes, "0.0.0.0", AppConfig.fundmngGate.admin.port)
   logger.info(s"""Server online at http://0.0.0.0:${AppConfig.fundmngGate.admin.port}/ ...""")

@@ -5,17 +5,23 @@ import javax.ws.rs.Path
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.util.FastFuture
+import akka.http.scaladsl.util.FastFuture._
+import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.{ AdminDAO, GroupDAO }
+import com.heqiying.fundmng.gate.dao.{ ActiIdentityRPC, AdminDAO, GroupDAO }
 import com.heqiying.fundmng.gate.model.Admin
+import com.heqiying.fundmng.gate.directives.AuthDirective._
+import com.heqiying.fundmng.gate.interface.ActivitiInterface
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 @Api(value = "Admin API", produces = "application/json")
 @Path("/api/v1/admins")
-class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
+class AdminAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
   val routes = getRoute ~ postRoute ~ getXRoute ~ putXRoute ~ deleteXRoute ~ getAdminGroupsRoute
 
   @ApiOperation(value = "get admins", nickname = "get-admins", httpMethod = "GET")
@@ -43,13 +49,24 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
     import com.heqiying.fundmng.gate.model.AdminJsonSupport._
     post {
       formFields(('loginName, 'password, 'adminName, 'email, 'wxid.?)) { (loginName, password, adminName, email, wxid) =>
-        val admin = Admin(None, loginName, password, adminName, email, wxid, System.currentTimeMillis(), None)
-        logger.debug(s"Add new admin: ${admin.toString}")
-        onComplete(AdminDAO.insert(admin)) {
-          case Success(_) => complete(admin)
-          case Failure(e) =>
-            logger.error(s"post admins failed! Errors: $e")
-            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        extractAccesser { accesser =>
+          val adminO = AdminDAO.getOneByLoginName(loginName)
+          val r = adminO.fast.flatMap {
+            case None =>
+              val now = System.currentTimeMillis()
+              val admin = Admin(None, loginName, password, adminName, email, wxid, now, Some(now))
+              logger.debug(s"Add new admin: ${admin.toString}")
+              val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+              AdminDAO.insert(admin, actiRPC).fast.map(_ => Right(admin.copy(password = "")))
+            case _ => Future(Left("已存在相同管理员"))
+          }
+          onComplete(r) {
+            case Success(Right(x)) => complete(x)
+            case Success(Left(e)) => complete(HttpResponse(StatusCodes.BadRequest, entity = e))
+            case Failure(e) =>
+              logger.error(s"post admins failed! Errors: $e")
+              complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+          }
         }
       }
     }
@@ -86,11 +103,14 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
   def putXRoute = path("api" / "v1" / "admins" / IntNumber) { adminid =>
     put {
       formFields(('password, 'adminName, 'email, 'wxid.?)) { (password, adminName, email, wxid) =>
-        onComplete(AdminDAO.update(adminid, password, adminName, email, wxid)) {
-          case Success(r) => complete(HttpResponse(StatusCodes.OK))
-          case Failure(e) =>
-            logger.error(s"update admin by id $adminid failed: $e")
-            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        extractAccesser { accesser =>
+          val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+          onComplete(AdminDAO.update(adminid, password, adminName, email, wxid, actiRPC)) {
+            case Success(r) => complete(HttpResponse(StatusCodes.OK))
+            case Failure(e) =>
+              logger.error(s"update admin by id $adminid failed: $e")
+              complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+          }
         }
       }
     }
@@ -103,11 +123,14 @@ class AdminAPI(implicit system: ActorSystem) extends LazyLogging {
   ))
   def deleteXRoute = path("api" / "v1" / "admins" / IntNumber) { adminid =>
     delete {
-      onComplete(AdminDAO.delete(adminid)) {
-        case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
-        case Failure(e) =>
-          logger.error(s"delete admin by id $adminid failed: $e")
-          complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+      extractAccesser { accesser =>
+        val actiRPC: Option[ActiIdentityRPC] = accesser.map(x => new ActivitiInterface(x.loginName)).map(new ActiIdentityRPC(_))
+        onComplete(AdminDAO.delete(adminid, actiRPC)) {
+          case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
+          case Failure(e) =>
+            logger.error(s"delete admin by id $adminid failed: $e")
+            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+        }
       }
     }
   }
