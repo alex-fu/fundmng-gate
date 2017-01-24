@@ -7,11 +7,10 @@ import com.heqiying.fundmng.gate.api._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.GroupDAO
 import com.heqiying.fundmng.gate.directives.AuthDirective
-import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
+import com.heqiying.fundmng.gate.model.{Accesser, Groups}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.Future
 import scala.util.Success
 
 class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
@@ -41,8 +40,8 @@ class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMateriali
         }
         r match {
           case Some(f) =>
-            Await.ready(f, 10.seconds).value match {
-              case Some(Success(_)) => r0
+            onComplete(f) {
+              case Success(_) => r0
               case _ => AuthDirective.notFoundRoute
             }
           case None => r0

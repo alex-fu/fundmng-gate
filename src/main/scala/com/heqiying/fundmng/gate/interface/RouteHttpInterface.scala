@@ -3,21 +3,20 @@ package com.heqiying.fundmng.gate.interface
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ HttpResponse, StatusCodes, Uri }
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{ Sink, Source }
-import com.heqiying.fundmng.gate.common.{ LazyLogging, ProxyConfig }
-import com.heqiying.fundmng.gate.dao.{ AuthorityDAO, GroupDAO }
+import akka.stream.scaladsl.{Sink, Source}
+import com.heqiying.fundmng.gate.common.{LazyLogging, ProxyConfig}
+import com.heqiying.fundmng.gate.dao.{AuthorityDAO, GroupDAO}
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.directives.ExtendPathMatchers
-import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
+import com.heqiying.fundmng.gate.model.{Accesser, Groups}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
-import scala.util.Try
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) extends LazyLogging {
   private[this] def debugRoutePolicies(policies: Map[String, Set[String]]) = {
@@ -81,8 +80,14 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
       extractUri { uri =>
         policies match {
           case Some(x) =>
-            forwardPolicy(Try(Await.result(x, 10.seconds)).getOrElse(Map())) {
-              proxy(uri.path.toString(), accesser)
+            onComplete(x.map(forwardPolicy)) {
+              case Success(d) =>
+                d {
+                  proxy(uri.path.toString(), accesser)
+                }
+              case Failure(e) =>
+                logger.error(s"calculate forward policy failed: $e")
+                reject
             }
           case _ => proxy(uri.path.toString(), accesser)
         }
