@@ -19,6 +19,8 @@ import scala.util.{ Failure, Success }
 @Api(value = "Group API", produces = "application/json")
 @Path("/api/v1/groups")
 class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
+  // Note: getInvestorGroupAuthoritiesRoute and putInvestorGroupAuthoritiesRoute MUST be
+  // concat before getGroupAuthoritiesRoute and putGroupAuthoritiesRoute
   val routes = getRoute ~ postRoute ~ getXRoute ~ deleteXRoute ~
     getGroupAdminsRoute ~ putGroupAdminsRoute ~
     getInvestorGroupAuthoritiesRoute ~ putInvestorGroupAuthoritiesRoute ~
