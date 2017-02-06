@@ -7,7 +7,7 @@ import com.heqiying.fundmng.gate.api._
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.GroupDAO
 import com.heqiying.fundmng.gate.directives.AuthDirective
-import com.heqiying.fundmng.gate.model.{Accesser, Groups}
+import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -31,8 +31,7 @@ class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMateriali
           case Some(x) =>
             logger.info(s"""Authenticated Accesser ${x.loginName}(${x.name.getOrElse("")}) request to ${method.value} ${uri.path.toString()}""")
             val r = for {
-              groupids <- GroupDAO.getGroupsForAdmin(x.id)
-              groupNames <- Future.sequence(groupids.map(GroupDAO.getOne)).map(_.flatten).map(_.map(_.groupName))
+              groupNames <- GroupDAO.getGroupsForAdmin(x.loginName)
               if groupNames contains Groups.GroupNameSystemAdmin
             } yield x.loginName
             Some(r)
@@ -41,8 +40,8 @@ class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMateriali
         r match {
           case Some(f) =>
             onComplete(f) {
-              case Success(_) => r0
-              case _ => AuthDirective.notFoundRoute
+              case Success(_) => r0 ~ AuthDirective.forbiddenRoute
+              case _ => AuthDirective.forbiddenRoute
             }
           case None => r0
         }

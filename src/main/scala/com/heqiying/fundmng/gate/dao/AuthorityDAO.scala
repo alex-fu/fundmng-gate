@@ -28,15 +28,15 @@ object AuthorityDAO extends LazyLogging {
     db.run(q)
   }
 
-  def getAuthoritiesInGroup(groupId: Int) = {
-    val q = authorityGroupMappingsQ.filter(_.groupId === groupId).map(_.authorityName).result
+  def getAuthoritiesInGroup(groupName: String) = {
+    val q = authorityGroupMappingsQ.filter(_.groupName === groupName).map(_.authorityName).result
     sqlDebug(q.statements.mkString(";\n"))
     db.run(q)
   }
 
-  def postAuthoritiesInGroup(groupId: Int, authorityNames: Iterable[String]) = {
-    val q1 = authorityGroupMappingsQ.filter(_.groupId === groupId).delete
-    val mappings = authorityNames.map(authorityName => AuthorityGroupMapping(None, authorityName, groupId))
+  def postAuthoritiesInGroup(groupName: String, authorityNames: Iterable[String]) = {
+    val q1 = authorityGroupMappingsQ.filter(_.groupName === groupName).delete
+    val mappings = authorityNames.map(authorityName => AuthorityGroupMapping(None, authorityName, groupName))
     val q2 = authorityGroupMappingsQ ++= mappings
     val q = DBIO.seq(q1, q2).transactionally
     sqlDebug(q1.statements.mkString(";\n"))

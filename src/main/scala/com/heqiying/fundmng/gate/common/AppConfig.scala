@@ -14,7 +14,7 @@ object AppConfig {
   case class SecurityConfig(authentication: Boolean, algo: String, userSalt: String, domain: String)
   case class PrivateConfig(allowAllAddress: Boolean, allowedAddresses: List[String])
   case class RouteConfig(patterns: List[String])
-  case class ActivitiConfig(host: String, port: Int, baseUri: String, defaultPassword: String)
+  case class ActivitiConfig(host: String, port: Int, baseUri: String, defaultPassword: String, dummyUser: String, dummyPassword: String)
   case class RDSConfig(`type`: String)
 
   def fromConfig(config: Config): AppConfig = config.read[AppConfig]("fundmng-gate")

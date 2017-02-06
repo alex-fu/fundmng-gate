@@ -31,12 +31,12 @@ class LoginAPI extends LazyLogging {
     post {
       formFields(('loginName, 'password)) { (loginName, password) =>
         onComplete {
-          AdminDAO.getOneByLoginName(loginName).map {
+          AdminDAO.getOne(loginName).map {
             case None => Left("Admin not exist!")
             case Some(admin) =>
               if (admin.password != password) Left("Wrong password!")
               else {
-                val accesser = Accesser(admin.adminId.get, admin.loginName, Some(admin.adminName), Some(admin.email), admin.wxid, Groups.GroupTypeAdmin)
+                val accesser = Accesser(admin.loginName, Some(admin.adminName), Some(admin.email), admin.wxid, Groups.GroupTypeAdmin)
                 Right(AuthDirective.buildJWT(accesser))
               }
           }

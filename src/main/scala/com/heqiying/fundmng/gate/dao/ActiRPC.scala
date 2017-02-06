@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ HttpResponse, RequestEntity }
 import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging }
 import com.heqiying.fundmng.gate.interface.ActivitiInterface
-import com.heqiying.fundmng.gate.model.activiti
+import com.heqiying.fundmng.gate.model.{ Accesser, activiti }
 
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
@@ -27,6 +27,18 @@ trait ActiHelper extends LazyLogging {
       case Failure(e) =>
         logger.error(s"access to $relativeUri failed: $e")
     }
+  }
+}
+
+object ActiIdentityRPC {
+  private def default(implicit system: ActorSystem, mat: ActorMaterializer) = new ActiIdentityRPC(
+    new ActivitiInterface(AppConfig.fundmngGate.activiti.dummyUser, Some(AppConfig.fundmngGate.activiti.dummyPassword))
+  )
+  def create(accesser: Option[Accesser])(implicit system: ActorSystem, mat: ActorMaterializer): ActiIdentityRPC = {
+    accesser.
+      map(x => new ActivitiInterface(x.loginName)).
+      map(new ActiIdentityRPC(_)).
+      getOrElse(default)
   }
 }
 

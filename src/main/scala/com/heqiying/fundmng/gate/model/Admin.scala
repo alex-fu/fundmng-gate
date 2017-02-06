@@ -5,12 +5,12 @@ import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import slick.profile.SqlProfile.ColumnOption.Nullable
 import spray.json._
 
-case class Admin(adminId: Option[Int], loginName: String, password: String, adminName: String,
-  email: String, wxid: Option[String], createAt: Long, updateAt: Option[Long])
+case class Admin(loginName: String, password: String, adminName: String,
+  email: String, wxid: Option[String], createAt: Long, updateAt: Long)
 
-case class Accesser(id: Int, loginName: String, name: Option[String], email: Option[String], wxid: Option[String], groupType: String)
+case class Accesser(loginName: String, name: Option[String], email: Option[String], wxid: Option[String], groupType: String)
 
-case class Group(groupId: Option[Int], groupName: String, groupType: String)
+case class Group(groupName: String, groupType: String)
 
 object Groups {
   val GroupTypeAdmin = "AdminGroup"
@@ -21,22 +21,20 @@ object Groups {
   val GroupNameSystemAdmin = "SystemAdmin"
 }
 
-case class GroupAdminMapping(mappingId: Option[Int], groupId: Int, adminId: Int)
+case class GroupAdminMapping(mappingId: Option[Int], groupName: String, adminName: String)
 
 case class AuthorityExpression(httpMethods: Seq[String], pathExpression: String)
 
 case class Authority(authorityName: String, authorityLabel: String, expressions: Seq[AuthorityExpression])
 
-case class AuthorityGroupMapping(mappingId: Option[Int], authorityName: String, groupId: Int)
+case class AuthorityGroupMapping(mappingId: Option[Int], authorityName: String, groupName: String)
 
 class Admins(tag: Tag) extends Table[Admin](tag, "admins") {
-  def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
-
-  def loginName = column[String]("loginName", O.Length(255, varying = true))
+  def loginName = column[String]("login_name", O.Length(127, varying = false), O.PrimaryKey)
 
   def password = column[String]("password", O.Length(255, varying = true))
 
-  def adminName = column[String]("adminName", O.Length(255, varying = true))
+  def adminName = column[String]("admin_name", O.Length(255, varying = true))
 
   def email = column[String]("email", O.Length(127, varying = true))
 
@@ -44,43 +42,37 @@ class Admins(tag: Tag) extends Table[Admin](tag, "admins") {
 
   def createdAt = column[Long]("created_at")
 
-  def updatedAt = column[Long]("updated_at", Nullable)
+  def updatedAt = column[Long]("updated_at")
 
-  def idxLoginName = index("idx_loginName", loginName, unique = true)
-
-  def * = (id.?, loginName, password, adminName, email, wxid.?, createdAt, updatedAt.?) <> (Admin.tupled, Admin.unapply)
+  def * = (loginName, password, adminName, email, wxid.?, createdAt, updatedAt) <> (Admin.tupled, Admin.unapply)
 }
 
 class Groups(tag: Tag) extends Table[Group](tag, "groups") {
-  def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
-
-  def groupName = column[String]("group_name", O.Length(255, varying = true))
+  def groupName = column[String]("group_name", O.Length(127, varying = false), O.PrimaryKey)
 
   def groupType = column[String]("group_type", O.Length(127, varying = true))
 
-  def idxGroupName = index("idx_groupname", groupName, unique = true)
-
-  def * = (id.?, groupName, groupType) <> (Group.tupled, Group.unapply)
+  def * = (groupName, groupType) <> (Group.tupled, Group.unapply)
 }
 
 class GroupAdminMappings(tag: Tag) extends Table[GroupAdminMapping](tag, "group_admin_mappings") {
   def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
-  def groupId = column[Int]("group_id")
+  def groupName = column[String]("group_name", O.Length(127, varying = false))
 
-  def adminId = column[Int]("admin_id")
+  def loginName = column[String]("login_name", O.Length(127, varying = false))
 
-  def foreignKeyGroupId = foreignKey("GA_GRPID_FK", groupId, DBSchema.groups)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
+  def foreignKeyGroup = foreignKey("GA_GRP_FK", groupName, DBSchema.groups)(_.groupName, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-  def foreignKeyAdminId = foreignKey("GA_ADMID_FK", adminId, DBSchema.admins)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
+  def foreignKeyAdmin = foreignKey("GA_ADM_FK", loginName, DBSchema.admins)(_.loginName, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-  def idxGroupAdmin = index("idx_groupadmin", (groupId, adminId), unique = true)
+  def idxGroupAdmin = index("idx_groupadmin", (groupName, loginName), unique = true)
 
-  def * = (id.?, groupId, adminId) <> (GroupAdminMapping.tupled, GroupAdminMapping.unapply)
+  def * = (id.?, groupName, loginName) <> (GroupAdminMapping.tupled, GroupAdminMapping.unapply)
 }
 
 class Authorities(tag: Tag) extends Table[Authority](tag, "authorities") {
-  def authorityName = column[String]("authority_name", O.Length(255, varying = true), O.PrimaryKey)
+  def authorityName = column[String]("authority_name", O.Length(127, varying = false), O.PrimaryKey)
 
   def authorityLabel = column[String]("authority_label", O.Length(255, varying = true))
 
@@ -111,27 +103,27 @@ object Authorities {
 class AuthorityGroupMappings(tag: Tag) extends Table[AuthorityGroupMapping](tag, "authority_group_mappings") {
   def id = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
-  def authorityName = column[String]("authority_name", O.Length(255, varying = true))
+  def authorityName = column[String]("authority_name", O.Length(127, varying = false))
 
-  def groupId = column[Int]("group_id")
+  def groupName = column[String]("group_name", O.Length(127, varying = false))
 
-  def foreignKeyGroupId = foreignKey("AG_GRPID_FK", groupId, DBSchema.groups)(_.id, onUpdate = ForeignKeyAction.Restrict, onDelete = ForeignKeyAction.Cascade)
+  def foreignKeyGroupId = foreignKey("AG_GRP_FK", groupName, DBSchema.groups)(_.groupName, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-  def idxAuthorityGroup = index("idx_authoritygroup", (authorityName, groupId), unique = true)
+  def idxAuthorityGroup = index("idx_authoritygroup", (authorityName, groupName), unique = true)
 
-  def * = (id.?, authorityName, groupId) <> (AuthorityGroupMapping.tupled, AuthorityGroupMapping.unapply)
+  def * = (id.?, authorityName, groupName) <> (AuthorityGroupMapping.tupled, AuthorityGroupMapping.unapply)
 }
 
 object AdminJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val adminJsonFormat: RootJsonFormat[Admin] = jsonFormat8(Admin.apply)
+  implicit val adminJsonFormat: RootJsonFormat[Admin] = jsonFormat7(Admin.apply)
 }
 
 object AccesserJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val accesserJsonFormat = jsonFormat6(Accesser.apply)
+  implicit val accesserJsonFormat = jsonFormat5(Accesser.apply)
 }
 
 object GroupJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
-  implicit val groupJsonFormat: RootJsonFormat[Group] = jsonFormat3(Group.apply)
+  implicit val groupJsonFormat: RootJsonFormat[Group] = jsonFormat2(Group.apply)
 }
 
 object AuthorityRegressionExpressionJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {

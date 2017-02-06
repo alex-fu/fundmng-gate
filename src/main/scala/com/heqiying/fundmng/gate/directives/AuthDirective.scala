@@ -1,20 +1,19 @@
 package com.heqiying.fundmng.gate.directives
 
 import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server._
 import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging }
 import com.heqiying.fundmng.gate.model.Accesser
 import io.igl.jwt._
-import org.apache.commons.codec.binary.Base64
 import spray.json._
 
 import scala.util.{ Failure, Success, Try }
 
 object AuthParams {
-  val authenticationRequired = AppConfig.fundmngGate.api.security.authentication
-  val JwtAlgo = AppConfig.fundmngGate.api.security.algo
-  val salt = AppConfig.fundmngGate.api.security.userSalt
+  val authenticationRequired: Boolean = AppConfig.fundmngGate.api.security.authentication
+  val JwtAlgo: String = AppConfig.fundmngGate.api.security.algo
+  val salt: String = AppConfig.fundmngGate.api.security.userSalt
 
   val issuer = "fundmng"
 
@@ -26,6 +25,7 @@ object AuthParams {
 }
 
 object AuthDirective extends LazyLogging {
+
   import AuthParams._
 
   def buildJWT(accesser: Accesser): String = {
@@ -128,7 +128,7 @@ object AuthDirective extends LazyLogging {
   }
 
   val rejectDirective: Directive0 = Directive(_ => reject)
-  val forbiddenRoute = complete(HttpResponse(StatusCodes.Forbidden, entity = "Forbidden to access!"))
-  val notFoundRoute = complete(HttpResponse(StatusCodes.NotFound))
+  val forbiddenRoute: StandardRoute = complete(HttpResponse(StatusCodes.Forbidden, entity = "Forbidden to access!"))
+  val notFoundRoute: StandardRoute = complete(HttpResponse(StatusCodes.NotFound))
 }
 

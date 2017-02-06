@@ -26,7 +26,7 @@ class AuthorityAPI extends LazyLogging {
         case Success(r) => complete(r)
         case Failure(e) =>
           logger.error(s"get authorities failed: $e")
-          complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+          complete(HttpResponse(StatusCodes.InternalServerError))
       }
     }
   }
@@ -44,7 +44,9 @@ class AuthorityAPI extends LazyLogging {
         collectFormData { datamapFuture =>
           val authorities_filename = datamapFuture.map { datamap =>
             datamap.getOrElse("authorities_file", Left("")) match {
-              case Right(fileInfo) => Some(fileInfo.targetFile)
+              case Right(fileInfo) =>
+                logger.info(s"upsert authorities ${fileInfo.fileName}")
+                Some(fileInfo.targetFile)
               case _ => None
             }
           }
@@ -60,7 +62,7 @@ class AuthorityAPI extends LazyLogging {
             case Success(Left(x)) => complete(HttpResponse(StatusCodes.BadRequest, entity = x))
             case Failure(e) =>
               logger.error(s"upsert authorities failed: $e")
-              complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+              complete(HttpResponse(StatusCodes.InternalServerError))
           }
         }
       }
@@ -80,7 +82,7 @@ class AuthorityAPI extends LazyLogging {
   //          case Success(r) => complete(HttpResponse(StatusCodes.OK))
   //          case Failure(e) =>
   //            logger.error(s"upsert authorities failed: $e")
-  //            complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
+  //            complete(HttpResponse(StatusCodes.InternalServerError))
   //        }
   //      }
   //    }
