@@ -9,16 +9,15 @@ import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{ Sink, Source }
 import com.heqiying.fundmng.gate.common.{ LazyLogging, ProxyConfig }
-import com.heqiying.fundmng.gate.dao.{ AuthorityDAO, GroupDAO }
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.directives.ExtendPathMatchers
-import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
+import com.heqiying.fundmng.gate.model.Accesser
+import com.heqiying.fundmng.gate.service.GateApp
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) extends LazyLogging {
+class RouteHttpInterface(implicit val app: GateApp, system: ActorSystem, mat: ActorMaterializer) extends LazyLogging {
   private[this] def debugRoutePolicies(policies: Map[String, Set[String]]) = {
     def mkString(policies: Map[String, Set[String]]) = {
       val logsb = new StringBuilder
@@ -55,30 +54,8 @@ class RouteHttpInterface(implicit system: ActorSystem, mat: ActorMaterializer) e
     }
 
     authenticateJWT { accesser =>
-      val policies = accesser match {
-        case Some(x) if x.groupType == Groups.GroupTypeAdmin =>
-          val r = for {
-            groupids <- GroupDAO.getGroupsForAdmin(x.loginName)
-            authorityNames <- Future.sequence(groupids.map(AuthorityDAO.getAuthoritiesInGroup)).map(_.flatten.toSet)
-            authorities <- Future.sequence(authorityNames.map(AuthorityDAO.getOne)).map(_.flatten.toSeq)
-            expressions <- Future(authorities.flatMap(_.expressions).
-              foldLeft(Map.empty[String, Set[String]])((m, x) => m + (x.pathExpression -> x.httpMethods.toSet)))
-          } yield expressions
-          Some(r)
-        case Some(x) if x.groupType == Groups.GroupTypeInvestor =>
-          val r = for {
-            group <- GroupDAO.getOrCreateInvestorGroup()
-            if group.nonEmpty
-            authorityNames <- AuthorityDAO.getAuthoritiesInGroup(group.get.groupName)
-            authorities <- Future.sequence(authorityNames.map(AuthorityDAO.getOne)).map(_.flatten.toSeq)
-            expressions <- Future(authorities.flatMap(_.expressions).
-              foldLeft(Map.empty[String, Set[String]])((m, x) => m + (x.pathExpression -> x.httpMethods.toSet)))
-          } yield expressions
-          Some(r)
-        case _ => None
-      }
       extractUri { uri =>
-        policies match {
+        app.getRoutePolicies(accesser) match {
           case Some(x) =>
             onComplete(x.map(forwardPolicy)) {
               case Success(d) =>

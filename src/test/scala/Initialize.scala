@@ -52,7 +52,7 @@ object InitData extends App {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  val now = System.currentTimeMillis()
+  val now = Some(System.currentTimeMillis())
   val initData = Seq(
     // init admins
     DBSchema.admins += Admin("fuyf", "fuyf", "YiFeng", "fuyifeng@heqiying.com", None, now, now),

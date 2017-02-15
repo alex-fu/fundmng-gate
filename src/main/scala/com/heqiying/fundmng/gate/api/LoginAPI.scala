@@ -2,54 +2,51 @@ package com.heqiying.fundmng.gate.api
 
 import javax.ws.rs.Path
 
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.headers.HttpCookie
 import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.AdminDAO
 import com.heqiying.fundmng.gate.directives.{ AuthDirective, AuthParams }
-import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
+import com.heqiying.fundmng.gate.service.GateApp
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
+import spray.json.DefaultJsonProtocol
 
 import scala.util.{ Failure, Success }
 
 @Api(value = "Login API", produces = "application/json", protocols = "http")
 @Path("/api/v1/")
-class LoginAPI extends LazyLogging {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
+class LoginAPI(implicit app: GateApp) extends LazyLogging {
+  case class LoginRequest(loginName: String, password: String)
+  object LoginRequestJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
+    implicit val jsonFormat = jsonFormat2(LoginRequest.apply)
+  }
 
   val routes = adminLoginRoute
 
   @Path("/adminLogin")
-  @ApiOperation(value = "Admin login", nickname = "admin-login", httpMethod = "POST")
+  @ApiOperation(value = "Admin login", nickname = "admin-login", consumes = "application/json", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "loginName", required = true, dataType = "string", paramType = "form"),
-    new ApiImplicitParam(name = "password", required = true, dataType = "string", paramType = "form")
+    new ApiImplicitParam(name = "request", value = """{"loginName":"fuyf","password":"fuyf"}""", required = true, dataType = "string", paramType = "body")
   ))
   def adminLoginRoute = path("api" / "v1" / "adminLogin") {
+    import LoginRequestJsonSupport._
     post {
-      formFields(('loginName, 'password)) { (loginName, password) =>
-        onComplete {
-          AdminDAO.getOne(loginName).map {
-            case None => Left("Admin not exist!")
-            case Some(admin) =>
-              if (admin.password != password) Left("Wrong password!")
-              else {
-                val accesser = Accesser(admin.loginName, Some(admin.adminName), Some(admin.email), admin.wxid, Groups.GroupTypeAdmin)
-                Right(AuthDirective.buildJWT(accesser))
-              }
-          }
-        } {
-          case Success(Right(jwt: String)) =>
+      entity(as[LoginRequest]) { req =>
+        onComplete(app.adminLogin(req.loginName, req.password)) {
+          case Success(Right(accesser)) =>
+            val jwt = AuthDirective.buildJWT(accesser)
             setCookie(HttpCookie(AuthParams.cookieName, value = jwt, httpOnly = true, domain = AuthParams.cookieDomain, path = AuthParams.cookiePath)) {
               complete(HttpResponse(StatusCodes.OK, entity = s"""{"jwt": $jwt}"""))
             }
           case Success(Left(x)) => complete(HttpResponse(StatusCodes.BadRequest, entity = x))
           case Failure(e) =>
-            logger.error(s"Admin $loginName login failed: $e")
+            logger.error(s"Admin ${req.loginName} login failed: $e")
             complete(HttpResponse(StatusCodes.InternalServerError, entity = e.toString))
         }
+      } ~ {
+        logger.error(s"login failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }

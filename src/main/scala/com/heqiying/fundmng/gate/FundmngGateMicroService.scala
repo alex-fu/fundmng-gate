@@ -7,6 +7,7 @@ import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging }
 import com.heqiying.fundmng.gate.interface._
 import com.heqiying.fundmng.gate.common.ProxyConfig
+import com.heqiying.fundmng.gate.service.GateApp
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -15,11 +16,11 @@ object FundmngGateMicroService extends App with LazyLogging {
   implicit val system = ActorSystem()
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
-  implicit val timeout = 10.seconds
 
   // load proxy routes at startup
   ProxyConfig.debugProxyRoute()
 
+  implicit val app = new GateApp()
   val swaggerDocService = new SwaggerDocService(system, mat)
   val loginInterface = new LoginHttpInterface()
   val routeInterface = new RouteHttpInterface()
@@ -32,7 +33,7 @@ object FundmngGateMicroService extends App with LazyLogging {
 
   sys addShutdownHook {
     logger.info(s"""Server will shutdown ...""")
-    Await.ready(httpBindingFuture.map(_.unbind()), timeout)
+    Await.ready(httpBindingFuture.map(_.unbind()), 10.seconds)
   }
 
   try {

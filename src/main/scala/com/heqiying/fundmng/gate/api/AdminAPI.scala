@@ -8,16 +8,16 @@ import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.directives.AuthDirective._
-import com.heqiying.fundmng.gate.model.Admin
-import com.heqiying.fundmng.gate.service.ManageApp
-import com.heqiying.fundmng.gate.utils.QueryParam
+import com.heqiying.fundmng.gate.model.{ Admin, UpdateAdminRequest }
+import com.heqiying.fundmng.gate.service.GateApp
+import com.heqiying.fundmng.gate.utils.{ QueryParam, QueryResultJsonSupport }
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
 import scala.util.{ Failure, Success }
 
-@Api(value = "Admin API", produces = "application/json")
+@Api(value = "Admin API", consumes = "application/json", produces = "application/json")
 @Path("/api/v1/admins")
-class AdminAPI(implicit val app: ManageApp, val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
+class AdminAPI(implicit val app: GateApp, val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
   val routes = getRoute ~ postRoute ~ getXRoute ~ putXRoute ~ deleteXRoute ~ getAdminGroupsRoute
 
   @ApiOperation(value = "get admins", nickname = "get-admins", httpMethod = "GET")
@@ -32,7 +32,9 @@ class AdminAPI(implicit val app: ManageApp, val system: ActorSystem, val mat: Ac
     get {
       parameters('sort.?, 'page.as[Int].?, 'size.as[Int].?, 'q.?).as(QueryParam) { qp =>
         onComplete(app.getAdmins(qp)) {
-          case Success(admins) => complete(admins.map(_.copy(password = "")))
+          case Success(r) =>
+            implicit val m = QueryResultJsonSupport.queryResultJsonFormat[Admin]()
+            complete(r)
           case Failure(e) =>
             logger.error(s"get admins failed! Errors: $e")
             complete(HttpResponse(StatusCodes.InternalServerError))
@@ -41,29 +43,27 @@ class AdminAPI(implicit val app: ManageApp, val system: ActorSystem, val mat: Ac
     }
   }
 
-  @ApiOperation(value = "create a new admin", nickname = "create-admin", consumes = "application/x-www-form-urlencoded", httpMethod = "POST")
+  @ApiOperation(value = "create a new admin", nickname = "create-admin", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "loginName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "password", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "adminName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "wxid", required = false, dataType = "string", paramType = "form", defaultValue = "")
+    new ApiImplicitParam(name = "request", value = """{"loginName":"test", "password":"test", "adminName":"test", "email":"test@test", "wxid":"test"}""", required = true, dataType = "string", paramType = "body", defaultValue = "")
   ))
   def postRoute = path("api" / "v1" / "admins") {
     import com.heqiying.fundmng.gate.model.AdminJsonSupport._
     post {
-      formFields(('loginName, 'password, 'adminName, 'email, 'wxid.?)) { (loginName, password, adminName, email, wxid) =>
+      entity(as[Admin]) { admin =>
         extractAccesser { accesser =>
           val now = System.currentTimeMillis()
-          val admin = Admin(loginName, password, adminName, email, wxid, now, now)
-          onComplete(app.addAdmin(admin, accesser)) {
+          onComplete(app.addAdmin(admin.copy(createdAt = Some(now), updatedAt = Some(now)), accesser)) {
             case Success(Right(x)) => complete(x)
             case Success(Left(e)) => complete(HttpResponse(StatusCodes.BadRequest, entity = e))
             case Failure(e) =>
-              logger.error(s"post admins failed! Errors: $e")
+              logger.error(s"update admins failed! Errors: $e")
               complete(HttpResponse(StatusCodes.InternalServerError))
           }
         }
+      } ~ {
+        logger.error(s"update admins failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }
@@ -88,25 +88,26 @@ class AdminAPI(implicit val app: ManageApp, val system: ActorSystem, val mat: Ac
   }
 
   @Path("/{loginName}")
-  @ApiOperation(value = "update admin", nickname = "update-admin", consumes = "application/x-www-form-urlencoded", httpMethod = "PUT")
+  @ApiOperation(value = "update admin", nickname = "update-admin", httpMethod = "PUT")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "loginName", required = true, dataType = "string", paramType = "path", defaultValue = ""),
-    new ApiImplicitParam(name = "password", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "adminName", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "email", required = true, dataType = "string", paramType = "form", defaultValue = ""),
-    new ApiImplicitParam(name = "wxid", required = false, dataType = "string", paramType = "form", defaultValue = "")
+    new ApiImplicitParam(name = "request", value = """{"password":"test", "adminName":"test", "email":"test@test", "wxid":"test"}""", required = true, dataType = "string", paramType = "body", defaultValue = "")
   ))
   def putXRoute = path("api" / "v1" / "admins" / Segment) { loginName =>
+    import com.heqiying.fundmng.gate.model.UpdateAdminRequestJsonSupport._
     put {
-      formFields(('password, 'adminName, 'email, 'wxid.?)) { (password, adminName, email, wxid) =>
+      entity(as[UpdateAdminRequest]) { req =>
         extractAccesser { accesser =>
-          onComplete(app.updateAdmin(loginName, password, adminName, email, wxid, accesser)) {
+          onComplete(app.updateAdmin(loginName, req, accesser)) {
             case Success(r) => complete(HttpResponse(StatusCodes.OK))
             case Failure(e) =>
-              logger.error(s"update admin $adminName failed: $e")
+              logger.error(s"update admin $loginName failed: $e")
               complete(HttpResponse(StatusCodes.InternalServerError))
           }
         }
+      } ~ {
+        logger.error(s"update admin $loginName failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }

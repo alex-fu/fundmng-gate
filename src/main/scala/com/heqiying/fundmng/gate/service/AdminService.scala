@@ -5,8 +5,9 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.util.FastFuture._
 import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.{ActiIdentityRPC, AdminDAO, GroupDAO}
-import com.heqiying.fundmng.gate.model.{Accesser, Admin}
+import com.heqiying.fundmng.gate.dao.{ ActiIdentityRPC, AdminDAO, GroupDAO }
+import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
+import com.heqiying.fundmng.gate.model.{ Accesser, Admin, UpdateAdminRequest }
 import com.heqiying.fundmng.gate.utils.QueryParam
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,13 +33,26 @@ trait AdminService extends LazyLogging {
     r
   }
 
-  def updateAdmin(loginName: String, password: String, adminName: String, email: String, wxid: Option[String], accesser: Option[Accesser]) = {
-    logger.info(s"update admin $loginName($password, $adminName, $email, $wxid)")
+  def updateAdmin(loginName: String, req: UpdateAdminRequest, accesser: Option[Accesser]) = {
+    def merge(orig: Admin, req: UpdateAdminRequest) = {
+      Admin(
+        orig.loginName,
+        req.password.getOrElse(orig.password),
+        req.adminName.getOrElse(orig.adminName),
+        req.email.getOrElse(orig.email),
+        req.wxid.orElse(orig.wxid),
+        orig.createdAt,
+        Some(System.currentTimeMillis())
+      )
+    }
+    logger.info(s"update admin $loginName as $req")
     val actiRPC = ActiIdentityRPC.create(accesser)
     val r = for {
-      r1 <- actiRPC.updateUser(loginName, adminName, email)
+      orig <- getAdminByName(loginName) if orig.nonEmpty
+      merged = merge(orig.get, req)
+      r1 <- actiRPC.updateUser(loginName, merged.adminName, merged.email)
       if r1.status == StatusCodes.OK
-      _ <- AdminDAO.update(loginName, password, adminName, email, wxid)
+      _ <- AdminDAO.update(loginName, merged)
     } yield ()
     r
   }

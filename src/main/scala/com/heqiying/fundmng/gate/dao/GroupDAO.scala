@@ -8,39 +8,10 @@ import com.heqiying.fundmng.gate.model._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object GroupDAO extends ComplexQuery[Groups] with LazyLogging {
-  private val groupsQ = DBSchema.groups
-  override val tableQ = groupsQ
+object GroupDAO extends CommonDAO[Groups#TableElementType, Groups] with LazyLogging {
+  override val tableQ = DBSchema.groups
+  override val pk = "groupName"
   private val groupAdminMappingsQ = DBSchema.groupAdminMappings
-
-  def getAll = {
-    db.run(groupsQ.result)
-  }
-
-  def insert(group: Group) = {
-    val q = groupsQ += group
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q)
-  }
-
-  def update(groupName: String, groupType: String) = {
-    val q = groupsQ.filter(_.groupName === groupName).map(x => (x.groupName, x.groupType))
-      .update(groupName, groupType)
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q)
-  }
-
-  def getOne(groupName: String) = {
-    val q = groupsQ.filter(_.groupName === groupName).result
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q.headOption)
-  }
-
-  def delete(groupName: String) = {
-    val q = groupsQ.filter(_.groupName === groupName).delete
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q)
-  }
 
   def getAdminsInGroup(groupName: String) = {
     val q = groupAdminMappingsQ.filter(_.groupName === groupName).map(_.loginName).result
@@ -67,7 +38,7 @@ object GroupDAO extends ComplexQuery[Groups] with LazyLogging {
 
   // Investor Group Jobs
   def getInvestorGroup() = {
-    val q1 = groupsQ.filter(_.groupType === Groups.GroupTypeInvestor).result.headOption
+    val q1 = tableQ.filter(_.groupType === Groups.GroupTypeInvestor).result.headOption
     sqlDebug(q1.statements.mkString(";\n"))
     db.run(q1)
   }

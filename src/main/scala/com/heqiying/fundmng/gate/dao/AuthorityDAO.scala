@@ -5,24 +5,14 @@ import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.model._
 
-object AuthorityDAO extends ComplexQuery[Authorities] with LazyLogging {
-  private val authoritiesQ = DBSchema.authorities
-  override val tableQ = authoritiesQ
+object AuthorityDAO extends CommonDAO[Authorities#TableElementType, Authorities] with LazyLogging {
+  override val tableQ = DBSchema.authorities
+  override val pk = "authorityName"
   private val authorityGroupMappingsQ = DBSchema.authorityGroupMapping
 
-  def getAll = {
-    db.run(authoritiesQ.result)
-  }
-
-  def getOne(authorityName: String) = {
-    val q = authoritiesQ.filter(_.authorityName === authorityName).result
-    sqlDebug(q.statements.mkString(";\n"))
-    db.run(q.headOption)
-  }
-
   def upsert(authorities: Iterable[Authority]) = {
-    val q1 = authoritiesQ.delete
-    val q2 = authoritiesQ ++= authorities
+    val q1 = tableQ.delete
+    val q2 = tableQ ++= authorities
     val q = DBIO.seq(q1, q2).transactionally
     sqlDebug(q1.statements.mkString(";\n"))
     sqlDebug(q2.statements.mkString(";\n"))

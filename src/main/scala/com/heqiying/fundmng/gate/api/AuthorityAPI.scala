@@ -2,31 +2,42 @@ package com.heqiying.fundmng.gate.api
 
 import javax.ws.rs.Path
 
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
+import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.AuthorityDAO
 import com.heqiying.fundmng.gate.model.Authority
+import com.heqiying.fundmng.gate.service.GateApp
+import com.heqiying.fundmng.gate.utils.{ QueryParam, QueryResultJsonSupport }
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
-import scala.concurrent.Future
-import scala.io.Source
 import scala.util.{ Failure, Success }
 
 @Path("/api/v1/authorities")
 @Api(value = "Authority API", produces = "application/json")
-class AuthorityAPI extends LazyLogging {
+class AuthorityAPI(implicit val app: GateApp, val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
   val routes = getRoute ~ putRoute
 
   @ApiOperation(value = "get authorities", nickname = "get-authorities", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "sort", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "page", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "size", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "q", required = false, dataType = "string", paramType = "query")
+  ))
   def getRoute = path("api" / "v1" / "authorities") {
     import com.heqiying.fundmng.gate.model.AuthorityJsonSupport._
     get {
-      onComplete(AuthorityDAO.getAll) {
-        case Success(r) => complete(r)
-        case Failure(e) =>
-          logger.error(s"get authorities failed: $e")
-          complete(HttpResponse(StatusCodes.InternalServerError))
+      parameters('sort.?, 'page.as[Int].?, 'size.as[Int].?, 'q.?).as(QueryParam) { qp =>
+        onComplete(app.getAuthorities(qp)) {
+          case Success(r) =>
+            implicit val m = QueryResultJsonSupport.queryResultJsonFormat[Authority]()
+            complete(r)
+          case Failure(e) =>
+            logger.error(s"get authorities failed: $e")
+            complete(HttpResponse(StatusCodes.InternalServerError))
+        }
       }
     }
   }
@@ -37,12 +48,11 @@ class AuthorityAPI extends LazyLogging {
   ))
   def putRoute = path("api" / "v1" / "authorities") {
     import com.heqiying.fundmng.gate.directives.MultipartFormDirective._
-    import spray.json._
-    import com.heqiying.fundmng.gate.model.AuthorityJsonSupport._
+
     put {
       extractExecutionContext { implicit ec =>
         collectFormData { datamapFuture =>
-          val authorities_filename = datamapFuture.map { datamap =>
+          val authorities_filepath = datamapFuture.map { datamap =>
             datamap.getOrElse("authorities_file", Left("")) match {
               case Right(fileInfo) =>
                 logger.info(s"upsert authorities ${fileInfo.fileName}")
@@ -50,14 +60,8 @@ class AuthorityAPI extends LazyLogging {
               case _ => None
             }
           }
-          val authorities = authorities_filename.map {
-            case Some(filename) => Some(Source.fromFile(filename).mkString.parseJson.convertTo[Seq[Authority]])
-            case _ => None
-          }
-          onComplete(authorities.flatMap {
-            case Some(x) => AuthorityDAO.upsert(x).map(x => Right(x))
-            case _ => Future(Left("please specify authorities file!"))
-          }) {
+
+          onComplete(app.updateAuthoritiesFromFile(authorities_filepath)) {
             case Success(Right(_)) => complete(HttpResponse(StatusCodes.OK))
             case Success(Left(x)) => complete(HttpResponse(StatusCodes.BadRequest, entity = x))
             case Failure(e) =>

@@ -34,7 +34,7 @@ object ProxyConfig extends LazyLogging {
   }
 
   def getProxyServer(uri: String): Option[(String, Int)] = {
-    getUriKey(uri).flatMap(k => Try(proxyRoutes(k)).toOption).headOption
+    getUriKey(uri).flatMap(k => proxyRoutes.get(k)).headOption
   }
 
   private[this] def getUriKey(uri: String): Seq[String] = {

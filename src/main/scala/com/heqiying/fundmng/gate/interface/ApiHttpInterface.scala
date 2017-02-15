@@ -8,13 +8,12 @@ import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.dao.GroupDAO
 import com.heqiying.fundmng.gate.directives.AuthDirective
 import com.heqiying.fundmng.gate.model.{ Accesser, Groups }
-import com.heqiying.fundmng.gate.service.ManageApp
+import com.heqiying.fundmng.gate.service.GateApp
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Success
 
-class ApiHttpInterface(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
-  implicit val app = new ManageApp()
+class ApiHttpInterface(implicit val app: GateApp, val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
 
   private[this] val routes = Seq(
     new AdminAPI routes,

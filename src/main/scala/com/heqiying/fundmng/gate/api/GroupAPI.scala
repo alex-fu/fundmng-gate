@@ -7,18 +7,17 @@ import akka.http.scaladsl.model.{ HttpResponse, StatusCodes }
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.heqiying.fundmng.gate.common.LazyLogging
-import com.heqiying.fundmng.gate.dao.{ ActiIdentityRPC, AdminDAO, AuthorityDAO, GroupDAO }
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.model.{ Group, Groups }
+import com.heqiying.fundmng.gate.service.GateApp
+import com.heqiying.fundmng.gate.utils.{ QueryParam, QueryResultJsonSupport }
 import io.swagger.annotations.{ Api, ApiImplicitParam, ApiImplicitParams, ApiOperation }
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-@Api(value = "Group API", produces = "application/json")
+@Api(value = "Group API", consumes = "application/json", produces = "application/json")
 @Path("/api/v1/groups")
-class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
+class GroupAPI(implicit val app: GateApp, val system: ActorSystem, val mat: ActorMaterializer) extends LazyLogging {
   // Note: getInvestorGroupAuthoritiesRoute and putInvestorGroupAuthoritiesRoute MUST be
   // concat before getGroupAuthoritiesRoute and putGroupAuthoritiesRoute
   val routes = getRoute ~ postRoute ~ getXRoute ~ deleteXRoute ~
@@ -27,42 +26,48 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
     getGroupAuthoritiesRoute ~ putGroupAuthoritiesRoute
 
   @ApiOperation(value = "get groups", nickname = "get-groups", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "sort", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "page", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "size", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "q", required = false, dataType = "string", paramType = "query")
+  ))
   def getRoute = path("api" / "v1" / "groups") {
     import com.heqiying.fundmng.gate.model.GroupJsonSupport._
     get {
-      onComplete(GroupDAO.getAll) {
-        case Success(r) => complete(r)
-        case Failure(e) =>
-          logger.error(s"get groups failed: $e")
-          complete(HttpResponse(StatusCodes.InternalServerError))
+      parameters('sort.?, 'page.as[Int].?, 'size.as[Int].?, 'q.?).as(QueryParam) { qp =>
+        onComplete(app.getGroups(qp)) {
+          case Success(r) =>
+            implicit val m = QueryResultJsonSupport.queryResultJsonFormat[Group]()
+            complete(r)
+          case Failure(e) =>
+            logger.error(s"get groups failed: $e")
+            complete(HttpResponse(StatusCodes.InternalServerError))
+        }
       }
     }
   }
 
-  @ApiOperation(value = "create a new group", nickname = "create-group", consumes = "application/x-www-form-urlencoded", httpMethod = "POST")
+  @ApiOperation(value = "create a new group", nickname = "create-group", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "groupName", required = true, dataType = "string", paramType = "form", defaultValue = "")
+    new ApiImplicitParam(name = "groupName", required = true, dataType = "string", paramType = "body", defaultValue = "")
   ))
   def postRoute = path("api" / "v1" / "groups") {
     import com.heqiying.fundmng.gate.model.GroupJsonSupport._
     post {
-      formFields('groupName) { groupName =>
+      entity(as[String]) { groupName =>
         extractAccesser { accesser =>
           val group = Group(groupName, Groups.GroupTypeAdmin)
-          logger.info(s"add new group: $group")
-          val actiRPC = ActiIdentityRPC.create(accesser)
-          val f = for {
-            r1 <- actiRPC.createGroup(groupName, groupName, group.groupType)
-            if Seq(StatusCodes.Created, StatusCodes.Conflict) contains r1.status
-            _ <- GroupDAO.insert(group)
-          } yield ()
-          onComplete(f) {
+          onComplete(app.addGroup(group, accesser)) {
             case Success(r) => complete(group)
             case Failure(e) =>
               logger.error(s"post groups failed: $e")
               complete(HttpResponse(StatusCodes.InternalServerError))
           }
         }
+      } ~ {
+        logger.error(s"post groups failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }
@@ -75,7 +80,7 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   def getXRoute = path("api" / "v1" / "groups" / Segment) { groupName =>
     import com.heqiying.fundmng.gate.model.GroupJsonSupport._
     get {
-      onComplete(GroupDAO.getOne(groupName)) {
+      onComplete(app.getGroupByName(groupName)) {
         case Success(Some(r)) => complete(r)
         case Success(None) => complete(HttpResponse(StatusCodes.NotFound))
         case Failure(e) =>
@@ -93,14 +98,7 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   def deleteXRoute = path("api" / "v1" / "groups" / Segment) { groupName =>
     delete {
       extractAccesser { accesser =>
-        logger.info(s"delete group: $groupName")
-        val actiRPC = ActiIdentityRPC.create(accesser)
-        val f = for {
-          r1 <- actiRPC.deleteGroup(groupName)
-          if Seq(StatusCodes.NoContent, StatusCodes.NotFound) contains r1.status
-          _ <- GroupDAO.delete(groupName)
-        } yield ()
-        onComplete(f) {
+        onComplete(app.deleteGroup(groupName, accesser)) {
           case Success(_) => complete(HttpResponse(StatusCodes.NoContent))
           case Failure(e) =>
             logger.error(s"delete group $groupName failed: $e")
@@ -117,17 +115,8 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   ))
   def getGroupAdminsRoute = path("api" / "v1" / "groups" / Segment / "admins") { groupName =>
     import com.heqiying.fundmng.gate.model.AdminJsonSupport._
-
-    import scala.concurrent.ExecutionContext.Implicits.global
     get {
-      val adminNames = GroupDAO.getAdminsInGroup(groupName)
-      val admins = adminNames.flatMap { xs =>
-        Future.sequence(xs.map { adminName =>
-          AdminDAO.getOne(adminName)
-        })
-      }.map(_.flatten)
-
-      onComplete(admins) {
+      onComplete(app.getAdminsInGroup(groupName)) {
         case Success(r) => complete(r)
         case Failure(e) =>
           logger.error(s"get admins in group $groupName failed: $e")
@@ -147,28 +136,17 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
     import spray.json.DefaultJsonProtocol._
     put {
       entity(as[Seq[String]]) { adminNames =>
-        logger.info(s"update admins in group $groupName with $adminNames")
         extractAccesser { accesser =>
-          val actiRPC = ActiIdentityRPC.create(accesser)
-          val f = for {
-            existedAdminNames <- GroupDAO.getAdminsInGroup(groupName)
-            s0 = existedAdminNames.toSet
-            s1 = adminNames.toSet
-            toDeletes = s0 -- s1
-            toAdds = s1 -- s0
-            r1 <- Future.sequence(toDeletes.map(ys => actiRPC.deleteMemberFromGroup(groupName, ys)))
-            if r1.forall(r => Seq(StatusCodes.NoContent, StatusCodes.NotFound).contains(r.status))
-            r2 <- Future.sequence(toAdds.map(ys => actiRPC.addMemberToGroup(groupName, ys)))
-            if r2.forall(r => Seq(StatusCodes.Created, StatusCodes.Conflict).contains(r.status))
-            _ <- GroupDAO.postAdminsInGroup(groupName, adminNames)
-          } yield ()
-          onComplete(f) {
+          onComplete(app.updateAdminsInGroup(groupName, adminNames, accesser)) {
             case Success(r) => complete(HttpResponse(StatusCodes.OK))
             case Failure(e) =>
               logger.error(s"post admins to group $groupName failed: $e")
               complete(HttpResponse(StatusCodes.InternalServerError))
           }
         }
+      } ~ {
+        logger.error(s"update admins in group $groupName failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }
@@ -180,17 +158,8 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   ))
   def getGroupAuthoritiesRoute = path("api" / "v1" / "groups" / Segment / "authorities") { groupName =>
     import com.heqiying.fundmng.gate.model.AuthorityJsonSupport._
-
-    import scala.concurrent.ExecutionContext.Implicits.global
     get {
-      val authorityNames: Future[Seq[String]] = AuthorityDAO.getAuthoritiesInGroup(groupName)
-      val authorities = authorityNames.flatMap { xs =>
-        Future.sequence(xs.map { authName =>
-          AuthorityDAO.getOne(authName)
-        })
-      }.map(_.flatten)
-
-      onComplete(authorities) {
+      onComplete(app.getAuthoritiesOnGroup(groupName)) {
         case Success(r) => complete(r)
         case Failure(e) =>
           logger.error(s"get authorities on group $groupName failed: $e")
@@ -210,14 +179,16 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
     import spray.json.DefaultJsonProtocol._
     put {
       entity(as[Seq[String]]) { authorityNames =>
-        logger.info(s"update authorities on group $groupName with $authorityNames")
-        onComplete(AuthorityDAO.postAuthoritiesInGroup(groupName, authorityNames)) {
+        onComplete(app.updateAuthoritiesOnGroup(groupName, authorityNames)) {
           case Success(r) => complete(HttpResponse(StatusCodes.OK))
           case Failure(e) =>
-            logger.error(s"post authorities on group $groupName failed: $e")
+            logger.error(s"update authorities on group $groupName failed: $e")
             complete(HttpResponse(StatusCodes.InternalServerError))
         }
       }
+    } ~ {
+      logger.error(s"update authorities on group $groupName failed! Errors: wrong argument")
+      complete(HttpResponse(StatusCodes.BadRequest))
     }
   }
 
@@ -225,22 +196,8 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   @ApiOperation(value = "get authorities on investorgroup", nickname = "get-authorities-on-investorgroup", httpMethod = "GET")
   def getInvestorGroupAuthoritiesRoute = path("api" / "v1" / "groups" / "investorgroup" / "authorities") {
     import com.heqiying.fundmng.gate.model.AuthorityJsonSupport._
-
-    import scala.concurrent.ExecutionContext.Implicits.global
     get {
-      val authorityNames: Future[Seq[String]] =
-        for {
-          investorGroup <- GroupDAO.getOrCreateInvestorGroup()
-          if investorGroup.nonEmpty
-          authorityNames <- AuthorityDAO.getAuthoritiesInGroup(investorGroup.get.groupName)
-        } yield authorityNames
-      val authorities = authorityNames.flatMap { xs =>
-        Future.sequence(xs.map { authName =>
-          AuthorityDAO.getOne(authName)
-        })
-      }.map(_.flatten)
-
-      onComplete(authorities) {
+      onComplete(app.getAuthoritiesOnInvestorGroup()) {
         case Success(r) => complete(r)
         case Failure(e) =>
           logger.error(s"get authorities on investor group failed: $e")
@@ -257,22 +214,17 @@ class GroupAPI(implicit val system: ActorSystem, val mat: ActorMaterializer) ext
   def putInvestorGroupAuthoritiesRoute = path("api" / "v1" / "groups" / "investorgroup" / "authorities") {
     import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
     import spray.json.DefaultJsonProtocol._
-
-    import scala.concurrent.ExecutionContext.Implicits.global
     put {
       entity(as[Seq[String]]) { authorityNames =>
-        logger.info(s"update authorities on investor group with $authorityNames")
-        val f = for {
-          investorGroup <- GroupDAO.getOrCreateInvestorGroup()
-          if investorGroup.nonEmpty
-          r <- AuthorityDAO.postAuthoritiesInGroup(investorGroup.get.groupName, authorityNames)
-        } yield r
-        onComplete(f) {
+        onComplete(app.updateAuthoritiesOnInvestorGroup(authorityNames)) {
           case Success(r) => complete(HttpResponse(StatusCodes.OK))
           case Failure(e) =>
-            logger.error(s"post authorities on investor group failed: $e")
+            logger.error(s"update authorities on investor group failed: $e")
             complete(HttpResponse(StatusCodes.InternalServerError))
         }
+      } ~ {
+        logger.error(s"update authorities on investor group failed! Errors: wrong argument")
+        complete(HttpResponse(StatusCodes.BadRequest))
       }
     }
   }
