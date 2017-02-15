@@ -3,13 +3,14 @@ package com.heqiying.fundmng.gate.dao
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
-import com.heqiying.fundmng.gate.model.{ DBSchema, Group, GroupAdminMapping, Groups }
+import com.heqiying.fundmng.gate.model._
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object GroupDAO extends LazyLogging {
+object GroupDAO extends ComplexQuery[Groups] with LazyLogging {
   private val groupsQ = DBSchema.groups
+  override val tableQ = groupsQ
   private val groupAdminMappingsQ = DBSchema.groupAdminMappings
 
   def getAll = {

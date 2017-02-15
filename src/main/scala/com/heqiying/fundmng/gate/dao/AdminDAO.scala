@@ -3,12 +3,13 @@ package com.heqiying.fundmng.gate.dao
 import com.heqiying.fundmng.gate.common.LazyLogging
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
-import com.heqiying.fundmng.gate.model.{ Admin, DBSchema }
+import com.heqiying.fundmng.gate.model.{Admin, Admins, DBSchema}
 
 import scala.concurrent.Future
 
-object AdminDAO extends LazyLogging {
+object AdminDAO extends ComplexQuery[Admins] with LazyLogging {
   private val adminsQ = DBSchema.admins
+  override val tableQ = adminsQ
 
   def getAll = {
     db.run(adminsQ.result)

@@ -5,8 +5,9 @@ import com.heqiying.fundmng.gate.database.MainDBProfile.profile.api._
 import com.heqiying.fundmng.gate.database.MainDBProfile._
 import com.heqiying.fundmng.gate.model._
 
-object AuthorityDAO extends LazyLogging {
+object AuthorityDAO extends ComplexQuery[Authorities] with LazyLogging {
   private val authoritiesQ = DBSchema.authorities
+  override val tableQ = authoritiesQ
   private val authorityGroupMappingsQ = DBSchema.authorityGroupMapping
 
   def getAll = {

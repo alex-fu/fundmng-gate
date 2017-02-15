@@ -6,7 +6,7 @@ import slick.profile.SqlProfile.ColumnOption.Nullable
 import spray.json._
 
 case class Admin(loginName: String, password: String, adminName: String,
-  email: String, wxid: Option[String], createAt: Long, updateAt: Long)
+  email: String, wxid: Option[String], createdAt: Long, updatedAt: Long)
 
 case class Accesser(loginName: String, name: Option[String], email: Option[String], wxid: Option[String], groupType: String)
 
