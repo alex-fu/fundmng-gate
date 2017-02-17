@@ -76,11 +76,15 @@ trait AdminService extends LazyLogging {
     AdminDAO.getOne(loginName)
   }
 
+  def getAdminGroupNames(loginName: String) = {
+    GroupDAO.getGroupsForAdmin(loginName)
+  }
+
   def getAdminGroups(loginName: String) = {
-    val groupIds = GroupDAO.getGroupsForAdmin(loginName)
-    val groups = groupIds.flatMap { xs =>
-      Future.sequence(xs.map { groupid =>
-        GroupDAO.getOne(groupid)
+    val groupNames = GroupDAO.getGroupsForAdmin(loginName)
+    val groups = groupNames.flatMap { xs =>
+      Future.sequence(xs.map { groupName =>
+        GroupDAO.getOne(groupName)
       })
     }.map(_.flatten)
     groups
