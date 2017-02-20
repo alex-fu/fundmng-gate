@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{ Sink, Source }
-import com.heqiying.fundmng.gate.common.{ LazyLogging, ProxyConfig }
+import com.heqiying.fundmng.gate.common.{ AppConfig, LazyLogging, ProxyConfig }
 import com.heqiying.fundmng.gate.directives.AuthDirective._
 import com.heqiying.fundmng.gate.directives.ExtendPathMatchers
 import com.heqiying.fundmng.gate.model.Accesser
@@ -53,20 +53,25 @@ class RouteHttpInterface(implicit val app: GateApp, system: ActorSystem, mat: Ac
       }.foldRight(rejectDirective)(_ | _)
     }
 
+    val needAuthorization = AppConfig.fundmngGate.api.authorization
     authenticateJWT { accesser =>
       extractUri { uri =>
-        app.getRoutePolicies(accesser) match {
-          case Some(x) =>
-            onComplete(x.map(forwardPolicy)) {
-              case Success(d) =>
-                d {
-                  proxy(uri.path.toString(), accesser)
-                }
-              case Failure(e) =>
-                logger.error(s"calculate forward policy failed: $e")
-                reject
-            }
-          case _ => proxy(uri.path.toString(), accesser)
+        if (needAuthorization) {
+          app.getRoutePolicies(accesser) match {
+            case Some(x) =>
+              onComplete(x.map(forwardPolicy)) {
+                case Success(d) =>
+                  d {
+                    proxy(uri.path.toString(), accesser)
+                  }
+                case Failure(e) =>
+                  logger.error(s"calculate forward policy failed: $e")
+                  reject
+              }
+            case _ => proxy(uri.path.toString(), accesser)
+          }
+        } else {
+          proxy(uri.path.toString(), accesser)
         }
       }
     }

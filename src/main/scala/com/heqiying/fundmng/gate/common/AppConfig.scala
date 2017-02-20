@@ -10,7 +10,7 @@ object AppConfig {
   import com.heqiying.konfig.Konfig._
 
   case class AdminConfig(name: String, port: Int)
-  case class ApiConfig(security: SecurityConfig, `private`: PrivateConfig)
+  case class ApiConfig(security: SecurityConfig, authorization: Boolean, `private`: PrivateConfig)
   case class SecurityConfig(authentication: Boolean, algo: String, userSalt: String, domain: String)
   case class PrivateConfig(allowAllAddress: Boolean, allowedAddresses: List[String])
   case class RouteConfig(patterns: List[String])
