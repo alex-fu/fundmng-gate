@@ -20,7 +20,8 @@ object GenInitTableSqls extends App {
       DBSchema.authorities.schema.createStatements ++
       DBSchema.authorityGroupMapping.schema.createStatements ++
       DBSchema.groupAdminMappings.schema.createStatements ++
-      DBSchema.accessRecords.schema.createStatements
+      DBSchema.accessRecords.schema.createStatements ++
+      DBSchema.uploads.schema.createStatements
 
   //  println(schemaSqls.mkString(";\n"))
 
@@ -42,7 +43,8 @@ object InitTable extends App {
     DBSchema.authorities.schema.create,
     DBSchema.authorityGroupMapping.schema.create,
     DBSchema.groupAdminMappings.schema.create,
-    DBSchema.accessRecords.schema.create
+    DBSchema.accessRecords.schema.create,
+    DBSchema.uploads.schema.create
   )
 
   Await.result(schemaSqls.foldLeft(FastFuture.successful[Any](()))((fs, x) => fs.flatMap(_ => db.run(x))), Duration.Inf)
